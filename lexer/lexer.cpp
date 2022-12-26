@@ -4,17 +4,19 @@
 #include <string>
 #include "lexer.h"
 
+lexer::lexer(std::string filename) {
+	this->name = filename;
+}
+
 std::vector<std::string> lexer::get_tokens() {
 	std::ifstream ifs(this->name);
 	std::string token, line;
 	std::vector<std::string> tokens;
 	while(std::getline(ifs, line)) {
 		for(char c : line) {
-			if(std::isalpha(c)) {
+			if(std::isalpha(c) || c == '(') {
 				token.push_back(c);
 				continue;
-			} else if(c == '(' || c == ')') {
-				continue; // ignoring parentesis
 			}
 			tokens.push_back(token); // functions dont work yet, if statements too
 			token.clear();
