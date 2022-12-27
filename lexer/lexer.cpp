@@ -3,6 +3,7 @@
 #include <sstream>
 #include <string>
 #include "lexer.h"
+#include "../parser/parser.h"
 
 lexer::lexer(std::string filename) {
 	this->name = filename;
@@ -14,11 +15,14 @@ std::vector<std::string> lexer::get_tokens() {
 	std::vector<std::string> tokens;
 	while(std::getline(ifs, line)) {
 		for(char c : line) {
-			if(std::isalpha(c) || c == '(') {
+			std::string pot_operator = std::string(1, c);
+			if(std::isalpha(c) || c == '(' || std::isdigit(c)) {
 				token.push_back(c);
 				continue;
+			} else if(parser::is_operator(pot_operator)) {
+				tokens.push_back(pot_operator);
 			}
-			tokens.push_back(token); // functions dont work yet, if statements too
+			(token.empty()) ? void() : tokens.push_back(token); // functions dont work yet, if statements too
 			token.clear();
 		}
 		tokens.push_back("\n"); // letting parser know that statement has ended
