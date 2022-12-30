@@ -1,5 +1,6 @@
 #include <iostream>
 #include <memory>
+#include <functional>
 #include "parser.h"
 
 parser::parser(std::vector<std::string> tokens) {
@@ -43,10 +44,6 @@ void AST::allocate_nodes() {
 
 bool parser::is_function(std::string token) {
 	return (token.find("(") == token.npos) ? false : true;
-}
-
-void parser::call_function(std::string name, std::vector<std::string> params, std::string op) {
-	
 }
 
 bool parser::tree_is_full(std::shared_ptr<AST> single_t, std::vector<std::shared_ptr<AST>> *ast_vec_ptr) {
@@ -97,13 +94,15 @@ void parser::parse_tree(std::vector<std::shared_ptr<AST>> tree) {
 		}
 	}
 }
-/*
-void parser::init_FMap(std::shared_ptr<FunctionMap> FMap) {
-	(*FMap)["print"] = std::make_shared<std::function<std::variant<bool, int, std::string>>>(std::cout);
+
+void parser::init_FMap(std::shared_ptr<FunctionMap> FMap) { // have to hardcode the functions, this is gonna be ugly
+	(*FMap)["print"] = (std::function<void(const std::string&)>)[](const std::string& s) {
+		std::cout << s << std::endl;
+	};
 }
-*/
 
 void parser::init_parser() {
 	auto FMap = std::make_shared<FunctionMap>();
+	init_FMap(FMap); // adding function pointers to Map
 	std::vector<std::shared_ptr<AST>> tree = create_tree();
 }
