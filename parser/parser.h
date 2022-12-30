@@ -1,8 +1,7 @@
 #pragma once
 #include <memory>
 #include <map>
-#include <functional>
-#include <variant>
+#include <any>
 #include "../lexer/lexer.h"
 
 class AST {
@@ -19,9 +18,9 @@ class AST {
 
 class parser {
 	private:
-	 	using FunctionMap = std::map<std::string, std::shared_ptr<std::function<std::variant<bool, int, std::string>>>>;
+		
+		using FunctionMap = std::map<std::string, std::any>;
 		std::vector<std::string> tokens;
-		//bool tree_is_full(std::shared_ptr<AST> single_t, std::vector<AST> *ast_vec_ptr); // not using smart pointers since not allocating to heap
 		bool tree_is_full(std::shared_ptr<AST> single_t, std::vector<std::shared_ptr<AST>> *ast_vec_ptr);
 		void call_function(std::string name, std::vector<std::string> params, std::string op = "");
 		void init_FMap(std::shared_ptr<FunctionMap> FMap);
