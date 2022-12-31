@@ -19,9 +19,10 @@ std::vector<std::string> lexer::get_tokens() {
 	std::string token, line;
 	std::vector<std::string> tokens;
 	while(std::getline(ifs, line)) {
+		(line[line.length() - 1] != ';') ? exit(1) : void(); // right now just simply exit, will do error handeling properly l8ter
 		for(char c : line) {
 			std::string pot_operator = std::string(1, c);
-			if(std::isalpha(c) || std::isdigit(c) || c == '(') {
+			if(std::isalpha(c) || std::isdigit(c) || c == '(' || c == '\\') {
 				if(c == '(')  {
 					token.append(pot_operator + ")"); // using variable that is not designed for this purpose
 					add_token(tokens, token);
@@ -33,9 +34,8 @@ std::vector<std::string> lexer::get_tokens() {
 				tokens.push_back(pot_operator);
 			}
 			add_token(tokens, token);
-			
 		}
-		tokens.push_back("\n"); // letting parser know that statement has ended
+		tokens.push_back("\b"); // letting parser know that statement has ended, using backslash because script can contain \n
 	}
 	if(!token.empty()) {
 		if(tokens[tokens.size() - 1] == "\n") {
