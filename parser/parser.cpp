@@ -1,8 +1,10 @@
 #include <iostream>
+#include <exception>
 #include <memory>
 #include <functional>
 #include <variant>
 #include "parser.h"
+
 
 parser::parser(std::vector<std::string> tokens) {
 	this->tokens = tokens;
@@ -11,7 +13,35 @@ parser::parser(std::vector<std::string> tokens) {
 AST::AST() {
 	root.clear();
 }
-void AST::add_node(std::string token) {
+
+ArgVector parser::calc_args(ArgVector args) {
+	ArgVector calced_args; // std::find doesnt work somehow
+	int i = 0;
+	for(auto x : args) {
+		if(is_operator(std::get<std::string>(x))) {
+			std::string op = std::get<std::string>(x);
+			auto x1 = std::atoi(std::get<std::string>(args[i - 1]).c_str()), x2 = std::atoi(std::get<std::string>(args[i + 1]).c_str());
+			if(op == "+") {
+				args[i] = x1 + x2;
+			} else if(op == "-") {
+				args[i] = x1 - x2;
+			} else if(op == "/") {
+				args[i] = x1 / x2;
+			} else { // ugly but it works for now
+				args[i] = x1 * x2;
+			}
+			args.erase(args.begin() + i + 1);
+			args.erase(args.begin() + i - 1);
+			if(args.size() <= 1) {
+				break;
+			}
+		}
+		i++;
+	}
+	return (calced_args.empty()) ? args : calced_args;
+}
+
+void AST::add_node(std::string token, std::shared_ptr<AST> node) {
 	std::shared_ptr<AST> next_t = std::make_shared<AST>();
 	if(!root.empty()) {
 		next_t->root = token; 
@@ -43,7 +73,7 @@ ArgVector AST::get_params(ArgVector params) {
 }
 
  bool parser::is_operator(std::string token) {
-	const std::vector<std::string> ops = {"=", "/", "+", "-"}; // treating char as string because token is string too
+	const std::vector<std::string> ops = {"=", "/", "+", "-", "*"}; // treating char as string because token is string too
 	for(std::string op : ops) {
 		if(op == token) {
 			return true;
@@ -56,7 +86,7 @@ bool parser::is_function(std::string token) {
 	return (token.find("(") == token.npos) ? false : true;
 }
 
-bool parser::tree_is_full(std::shared_ptr<AST> single_t, std::vector<std::shared_ptr<AST>> *ast_vec_ptr) {
+bool parser::tree_is_full(std::shared_ptr<AST> single_t) {
 	if(single_t != nullptr && single_t->left_node != nullptr && single_t->right_node != nullptr) {
 		return (!single_t->left_node->root.empty() && !single_t->right_node->root.empty() && !single_t->root.empty()) ? true : false;
 	}
@@ -84,11 +114,11 @@ std::vector<std::shared_ptr<AST>> parser::create_tree() {
 				continue;
 			}*/
 		}	
-		if(tree_is_full(single_t, &ast_vec)) {
-			(single_t->left_node->left_node == nullptr) ? single_t->left_node->add_node(tokens[i]) : single_t->right_node->add_node(tokens[i]);
+		if(tree_is_full(single_t)) {
+			(single_t->left_node->left_node == nullptr) ? single_t->left_node->add_node(tokens[i], single_t) : single_t->right_node->add_node(tokens[i], single_t);
 			continue;
 		}
-		single_t->add_node(tokens[i]);
+		single_t->add_node(tokens[i], single_t);
 
 	}
 	return ast_vec;
@@ -103,37 +133,50 @@ void parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<
 			auto next_tree = s_tree;
 			do {
 				temp_args = next_tree->get_params(args);
-				if(temp_args.empty()) {
+				if(temp_args.empty() || (!temp_args.empty() && temp_args == args)) {
 					break;
 				}
 				args = temp_args;
 				next_tree = (next_tree == s_tree->left_node || next_tree == nullptr) ? s_tree->right_node : s_tree->left_node;
 			} while(true);
+			args.pop_back();
+			args = calc_args(args);
 			call_function(FMap, f_name, args);
+		//	print(args);
 		}
 	}
+}
+
+bool parser::is_variant_int(std::variant<std::string, int, bool, double, float> i) {
+	try {
+		std::get<int>(i);
+	} catch(std::bad_variant_access) {
+		return false;
+	}
+	return true;
 }
 
 void parser::init_FMap(std::shared_ptr<FunctionMap> FMap) { // have to hardcode the functions, this is gonna be ugly
 	(*FMap)["print()"] = (std::function<void(ArgVector &args)>)[](ArgVector &args) {
 		for(auto i : args) {
-			std::string str;
+			std::string str{};
+			bool newline{};
 			try {
 				str = std::get<std::string>(i);
+				newline = newline = (std::get<std::string>(i).find("\\n") == std::string::npos) ? false : true;
 			} catch(const std::bad_variant_access&) {}
-			bool newline = (std::get<std::string>(i).find("\\n") == std::string::npos) ? false : true;
 			std::visit([=](auto &arg) {
 				if(str.empty()) {
-					std::cout << arg;
+					std::cout << arg;	
+					if(is_variant_int(arg)) {
+						std::cout << std::endl; // printing newline for numbers, otherwise zsh wont output them
+					}
 				} else {
 					if(newline) {
 						for(int i = 0; i< str.length() - 2; i++) {
 							std::cout << str[i];
 						}
 						std::cout << std::endl;
-					}
-					else {
-						std::cout << str;
 					}
 				}
 			}, i); // btw, this is what happens if you write code under pressure during New year celebrations LOL

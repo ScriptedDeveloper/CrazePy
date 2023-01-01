@@ -31,7 +31,9 @@ std::vector<std::string> lexer::get_tokens() {
 				token.push_back(c);
 				continue;
 			} else if(parser::is_operator(pot_operator)) {
+				add_token(tokens, token);
 				tokens.push_back(pot_operator);
+				continue;
 			}
 			add_token(tokens, token);
 		}

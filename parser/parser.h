@@ -11,7 +11,7 @@ using ArgVector = std::vector<std::variant<std::string, int, bool, double, float
 
 class AST {
 	public:	
-		void add_node(std::string token);
+		void add_node(std::string token, std::shared_ptr<class AST> node);
 		std::string root{};
 		std::shared_ptr<AST> left_node{}; // like a binary tree
 		void allocate_nodes();
@@ -27,8 +27,11 @@ class parser {
 		
 		using FunctionMap = std::map<std::string, std::any>;
 		std::vector<std::string> tokens;
-		bool tree_is_full(std::shared_ptr<AST> single_t, std::vector<std::shared_ptr<AST>> *ast_vec_ptr);
+		ArgVector sort_tree(ArgVector args);
+		bool tree_is_full(std::shared_ptr<AST> single_t);
 		void init_FMap(std::shared_ptr<FunctionMap> FMap);
+		void print(ArgVector args);
+		static bool is_variant_int(std::variant<std::string, int, bool, double, float> i);
 		template <typename P>
 		void call_function(std::shared_ptr<FunctionMap> FMap, std::string func_name, P params);
 	public:
@@ -37,6 +40,7 @@ class parser {
 		void parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<FunctionMap> FMap);
 		void init_parser();
 		bool is_function(std::string token);
+		static ArgVector calc_args(ArgVector args); // for expressions like 1+1 or Hello + World
 		parser(std::vector<std::string> tokens);
 
 };
