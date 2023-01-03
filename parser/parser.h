@@ -36,11 +36,11 @@ class parser {
 		void call_function(std::shared_ptr<FunctionMap> FMap, std::string func_name, P params);
 	public:
 		static bool is_operator(std::string token);
-		std::vector<std::shared_ptr<AST>> create_tree();
-		void parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<FunctionMap> FMap);
+		std::pair<std::vector<std::shared_ptr<AST>>, int> create_tree(); // pair because i wanna know the amount of nodes
+		void parse_tree(std::vector<std::shared_ptr<AST>> tree, int nodes, std::shared_ptr<FunctionMap> FMap);
 		void init_parser();
 		bool is_function(std::string token);
-		static ArgVector calc_args(ArgVector args); // for expressions like 1+1 or Hello + World
+		static ArgVector calc_args(ArgVector &args); // for expressions like 1+1 or Hello + World
 		parser(std::vector<std::string> tokens);
 
 };

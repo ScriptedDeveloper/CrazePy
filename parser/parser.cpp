@@ -1,6 +1,5 @@
 #include <iostream>
 #include <exception>
-#include <memory>
 #include <functional>
 #include <variant>
 #include "parser.h"
@@ -14,31 +13,32 @@ AST::AST() {
 	root.clear();
 }
 
-ArgVector parser::calc_args(ArgVector args) {
-	ArgVector calced_args; // std::find doesnt work somehow
+ArgVector parser::calc_args(ArgVector &args) {
 	int i = 0;
-	for(auto x : args) {
+	for(auto x : args) {	
+		if(args.size() <= 1) { 
+			break;
+		}
 		if(is_operator(std::get<std::string>(x))) {
 			std::string op = std::get<std::string>(x);
 			auto x1 = std::atoi(std::get<std::string>(args[i - 1]).c_str()), x2 = std::atoi(std::get<std::string>(args[i + 1]).c_str());
 			if(op == "+") {
-				args[i] = x1 + x2;
+				args[i] = std::to_string(x1 + x2);
 			} else if(op == "-") {
-				args[i] = x1 - x2;
+				args[i] = std::to_string(x1 - x2);
 			} else if(op == "/") {
-				args[i] = x1 / x2;
+				args[i] = std::to_string(x1 / x2);
 			} else { // ugly but it works for now
-				args[i] = x1 * x2;
+				args[i] = std::to_string(x1 * x2);
 			}
+			
 			args.erase(args.begin() + i + 1);
 			args.erase(args.begin() + i - 1);
-			if(args.size() <= 1) {
-				break;
-			}
+			break;
 		}
 		i++;
 	}
-	return (calced_args.empty()) ? args : calced_args;
+	return args;
 }
 
 void AST::add_node(std::string token, std::shared_ptr<AST> node) {
@@ -93,11 +93,12 @@ bool parser::tree_is_full(std::shared_ptr<AST> single_t) {
 	return false;
 }
 
-std::vector<std::shared_ptr<AST>> parser::create_tree() {
+std::pair<std::vector<std::shared_ptr<AST>>, int> parser::create_tree() {
 	std::vector<std::shared_ptr<AST>> ast_vec{};
 	auto single_t = std::make_shared<AST>();
 	single_t->allocate_nodes();
-	for(int i = 0; i < tokens.size(); i++) {
+	int i = 0;
+	for(; i < tokens.size(); i++) {
 		single_t = (single_t == nullptr) ? std::make_shared<AST>() : single_t;
 		if(tokens[i] == "\b") {
 			ast_vec.push_back(std::move(single_t));
@@ -121,28 +122,36 @@ std::vector<std::shared_ptr<AST>> parser::create_tree() {
 		single_t->add_node(tokens[i], single_t);
 
 	}
-	return ast_vec;
+	return std::make_pair(ast_vec, i);
 }
 
-void parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<FunctionMap> FMap) {
+void parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, int nodes, std::shared_ptr<FunctionMap> FMap) {
 	for(std::shared_ptr<AST> s_tree : tree) {
 		std::vector<std::string> args;
 		if(is_function(s_tree->root)) {
 			std::string f_name = s_tree->root;
-			ArgVector args, temp_args;
+			ArgVector temp_args, args;
 			auto next_tree = s_tree;
-			do {
+			while(args.size() < nodes) {
 				temp_args = next_tree->get_params(args);
 				if(temp_args.empty() || (!temp_args.empty() && temp_args == args)) {
 					break;
 				}
 				args = temp_args;
 				next_tree = (next_tree == s_tree->left_node || next_tree == nullptr) ? s_tree->right_node : s_tree->left_node;
-			} while(true);
+			}
+			args.erase(std::remove_if(args.begin(), args.end(), [](const auto& elm) {
+				if(std::holds_alternative<std::string>(elm)) {
+					return (std::get<std::string>(elm) == " " || std::get<std::string>(elm) == "") ? true : false;
+				}
+				return false;
+					}));
 			args.pop_back();
-			args = calc_args(args);
+			args.pop_back();
+			while(args.size() > 1) {
+				args = calc_args(args);
+			}
 			call_function(FMap, f_name, args);
-		//	print(args);
 		}
 	}
 }
@@ -177,6 +186,8 @@ void parser::init_FMap(std::shared_ptr<FunctionMap> FMap) { // have to hardcode 
 							std::cout << str[i];
 						}
 						std::cout << std::endl;
+					} else {
+						std::cout << arg;
 					}
 				}
 			}, i); // btw, this is what happens if you write code under pressure during New year celebrations LOL
@@ -188,6 +199,6 @@ void parser::init_FMap(std::shared_ptr<FunctionMap> FMap) { // have to hardcode 
 void parser::init_parser() {
 	auto FMap = std::make_shared<FunctionMap>();
 	init_FMap(FMap); // adding function pointers to Map
-	std::vector<std::shared_ptr<AST>> tree = create_tree();
-	parse_tree(tree, FMap);
+	std::pair<std::vector<std::shared_ptr<AST>>, int> tree = create_tree();
+	parse_tree(tree.first, tree.second, FMap);
 }
