@@ -1,6 +1,7 @@
 #include <iostream>
 #include <exception>
 #include <functional>
+#include <memory>
 #include <variant>
 #include "parser.h"
 
@@ -41,7 +42,8 @@ ArgVector parser::calc_args(ArgVector &args) {
 	return args;
 }
 
-void AST::add_node(std::string token, std::shared_ptr<AST> node) {
+std::shared_ptr<AST> AST::add_node(std::string token, std::shared_ptr<AST> node) {
+	/*
 	std::shared_ptr<AST> next_t = std::make_shared<AST>();
 	if(!root.empty()) {
 		next_t->root = token; 
@@ -56,19 +58,56 @@ void AST::add_node(std::string token, std::shared_ptr<AST> node) {
 		return;
 	}
 	root = token;
+	*/
+	auto node_temp = node;
+	while(true) {
+		if(node_temp->root.empty()) {
+			node_temp->root = token;
+			break;
+		}
+	//	node_temp = (node_temp->left_node == nullptr || node_temp->left_node->root.empty()) ? node_temp->left_node : node_temp->right_node;
+		(node_temp->left_node == nullptr || node_temp->right_node == nullptr) ? allocate_nodes(node_temp) : void();
+		if(node_temp->left_node->root.empty()) {
+			node_temp = node_temp->left_node;
+		} else {
+			node_temp = node_temp->right_node;
+		}
+	}
+	return node;
 }
 
-void AST::allocate_nodes() {
-	left_node = std::shared_ptr<AST>(new AST());
-	right_node = std::shared_ptr<AST>(new AST());
+void AST::allocate_nodes(std::shared_ptr<AST> ptr) {
+	if(ptr == nullptr) {
+		left_node = std::make_shared<AST>();
+		right_node = std::make_shared<AST>();
+		return;
+	}
+	ptr->left_node = std::make_shared<AST>();
+	ptr->right_node = std::make_shared<AST>();
 }
 
-ArgVector AST::get_params(ArgVector params) {
-	if(root.empty()) {
+ArgVector AST::get_params(ArgVector params, std::shared_ptr<AST> root_ptr) {
+	auto temp_ptr = root_ptr, previous_ptr = temp_ptr;	
+	if(root.empty() || root_ptr == nullptr) {
 		return {}; // returning nothing since invalid AST
 	}
-	(left_node == nullptr) ? void() : params.push_back(left_node->root);
-	(right_node == nullptr) ? void() : params.push_back(right_node->root);
+	while(params.size() <= root_ptr->nodes) {
+		try {
+			if(!temp_ptr->read) { 
+				params.push_back(temp_ptr->root);
+				temp_ptr->read = true;
+			} else if(params.size() < 1) {
+				params.push_back(temp_ptr->root); // preventing segfault by this
+				temp_ptr->read = true;
+			}
+		} catch(...) {}
+		if(temp_ptr->left_node != nullptr && !temp_ptr->left_node->root.empty()) {
+			previous_ptr = temp_ptr;
+			temp_ptr = temp_ptr->left_node;
+		} else {
+			temp_ptr = (temp_ptr->right_node == nullptr) ? previous_ptr->right_node : temp_ptr->right_node;
+		}
+	}
 	return params;
 }
 
@@ -93,64 +132,58 @@ bool parser::tree_is_full(std::shared_ptr<AST> single_t) {
 	return false;
 }
 
-std::pair<std::vector<std::shared_ptr<AST>>, int> parser::create_tree() {
+std::vector<std::shared_ptr<AST>> parser::create_tree() {
 	std::vector<std::shared_ptr<AST>> ast_vec{};
 	auto single_t = std::make_shared<AST>();
 	single_t->allocate_nodes();
 	int i = 0;
-	for(; i < tokens.size(); i++) {
+	for(auto token : tokens) {
 		single_t = (single_t == nullptr) ? std::make_shared<AST>() : single_t;
-		if(tokens[i] == "\b") {
+		if(token == "\b") {
+			single_t->nodes = i;
 			ast_vec.push_back(std::move(single_t));
+			single_t.reset();
+			i = 0;
 			continue;
 		}
 		if(single_t != nullptr && single_t->root.empty()) {
-		//	if(is_function(tokens[i])) {
-				single_t->root = tokens[i]; // setting function as root, if there is one
-				continue;
-		//	}
-			/*
-			else if(is_operator(tokens[i])) { // setting operators as root
-				single_t->root = tokens[i];
-				continue;
-			}*/
+			single_t->root = token; // setting function as root, if there is one
+			i++;
+			continue;
 		}	
 		if(tree_is_full(single_t)) {
-			(single_t->left_node->left_node == nullptr) ? single_t->left_node->add_node(tokens[i], single_t) : single_t->right_node->add_node(tokens[i], single_t);
+			single_t->add_node(token, single_t);
+			i++;
 			continue;
 		}
-		single_t->add_node(tokens[i], single_t);
+		single_t->add_node(token, single_t);
+		i++;
 
 	}
-	return std::make_pair(ast_vec, i);
+	return ast_vec;
 }
 
-void parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, int nodes, std::shared_ptr<FunctionMap> FMap) {
+void parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<FunctionMap> FMap) {
 	for(std::shared_ptr<AST> s_tree : tree) {
 		std::vector<std::string> args;
 		if(is_function(s_tree->root)) {
 			std::string f_name = s_tree->root;
 			ArgVector temp_args, args;
 			auto next_tree = s_tree;
-			while(args.size() < nodes) {
-				temp_args = next_tree->get_params(args);
-				if(temp_args.empty() || (!temp_args.empty() && temp_args == args)) {
-					break;
-				}
-				args = temp_args;
-				next_tree = (next_tree == s_tree->left_node || next_tree == nullptr) ? s_tree->right_node : s_tree->left_node;
-			}
+			temp_args = next_tree->get_params(args, s_tree);
+			args = temp_args;
+			next_tree = (next_tree == s_tree->left_node || next_tree == nullptr) ? s_tree->right_node : s_tree->left_node;
+			args.erase(args.begin()); // emptying function call
 			args.erase(std::remove_if(args.begin(), args.end(), [](const auto& elm) {
 				if(std::holds_alternative<std::string>(elm)) {
-					return (std::get<std::string>(elm) == " " || std::get<std::string>(elm) == "") ? true : false;
+					return (std::get<std::string>(elm) == "") ? true : false;
 				}
 				return false;
 					}));
-			args.pop_back();
-			args.pop_back();
-			while(args.size() > 1) {
+			temp_args = args;
+			do {
 				args = calc_args(args);
-			}
+			} while(args.size() > 1 && temp_args != args);
 			call_function(FMap, f_name, args);
 		}
 	}
@@ -159,7 +192,7 @@ void parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, int nodes, std::
 bool parser::is_variant_int(std::variant<std::string, int, bool, double, float> i) {
 	try {
 		std::get<int>(i);
-	} catch(std::bad_variant_access) {
+	} catch(std::bad_variant_access const&) {
 		return false;
 	}
 	return true;
@@ -172,7 +205,7 @@ void parser::init_FMap(std::shared_ptr<FunctionMap> FMap) { // have to hardcode 
 			bool newline{};
 			try {
 				str = std::get<std::string>(i);
-				newline = newline = (std::get<std::string>(i).find("\\n") == std::string::npos) ? false : true;
+				newline = (std::get<std::string>(i).find("\\n") == std::string::npos) ? false : true;
 			} catch(const std::bad_variant_access&) {}
 			std::visit([=](auto &arg) {
 				if(str.empty()) {
@@ -182,7 +215,7 @@ void parser::init_FMap(std::shared_ptr<FunctionMap> FMap) { // have to hardcode 
 					}
 				} else {
 					if(newline) {
-						for(int i = 0; i< str.length() - 2; i++) {
+						for(size_t i = 0; i< str.length() - 2; i++) {
 							std::cout << str[i];
 						}
 						std::cout << std::endl;
@@ -199,6 +232,6 @@ void parser::init_FMap(std::shared_ptr<FunctionMap> FMap) { // have to hardcode 
 void parser::init_parser() {
 	auto FMap = std::make_shared<FunctionMap>();
 	init_FMap(FMap); // adding function pointers to Map
-	std::pair<std::vector<std::shared_ptr<AST>>, int> tree = create_tree();
-	parse_tree(tree.first, tree.second, FMap);
+	std::vector<std::shared_ptr<AST>> tree = create_tree();
+	parse_tree(tree, FMap);
 }

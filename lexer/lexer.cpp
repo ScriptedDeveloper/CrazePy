@@ -27,10 +27,11 @@ std::vector<std::string> lexer::get_tokens() {
 					token.append(pot_operator + ")"); // using variable that is not designed for this purpose
 					add_token(tokens, token);
 					continue;
-				}
+				} 
 				token.push_back(c);
+				(token == "var") ? add_token(tokens, token) : void();
 				continue;
-			} else if(parser::is_operator(pot_operator)) {
+			} else if(parser::is_operator(pot_operator) || c == ' ') {
 				add_token(tokens, token);
 				tokens.push_back(pot_operator);
 				continue;
