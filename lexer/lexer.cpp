@@ -5,19 +5,19 @@
 #include "lexer.h"
 #include "../parser/parser.h"
 
-lexer::lexer(std::string filename) {
-	this->name = filename;
+lexer::lexer(std::string filename) : name(filename), tokens({}) {
+	
 }
 
-void lexer::add_token(std::vector<std::string> &tokens, std::string &token) {
-	(token.empty()) ? void() : tokens.push_back(token); // functions dont work yet, if statements too
+void lexer::add_token(std::vector<std::string> &curr_tokens, std::string &token) {
+	(token.empty()) ? void() : curr_tokens.push_back(token); // functions dont work yet, if statements too
 	token.clear();
 }
 
 std::vector<std::string> lexer::get_tokens() {
 	std::ifstream ifs(this->name);
 	std::string token, line;
-	std::vector<std::string> tokens;
+	std::vector<std::string> curr_tokens;
 	while(std::getline(ifs, line)) {
 		(line[line.length() - 1] != ';') ? exit(1) : void(); // right now just simply exit, will do error handeling properly l8ter
 		for(char c : line) {
@@ -50,7 +50,7 @@ std::vector<std::string> lexer::get_tokens() {
 			tokens.push_back(token);
 		}
 	}
-	this->tokens = tokens;
+	this->tokens = curr_tokens;
 	return tokens;
 }
 

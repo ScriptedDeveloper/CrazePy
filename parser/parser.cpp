@@ -4,13 +4,12 @@
 #include <memory>
 #include <variant>
 #include "parser.h"
+	
+parser::parser(std::vector<std::string> tokens_) : tokens(tokens_) {
 
-
-parser::parser(std::vector<std::string> tokens) {
-	this->tokens = tokens;
 }
 
-AST::AST() {
+AST::AST() : nodes() {
 	root.clear();
 }
 
@@ -165,7 +164,6 @@ std::vector<std::shared_ptr<AST>> parser::create_tree() {
 
 void parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<FunctionMap> FMap) {
 	for(std::shared_ptr<AST> s_tree : tree) {
-		std::vector<std::string> args;
 		if(is_function(s_tree->root)) {
 			std::string f_name = s_tree->root;
 			ArgVector temp_args, args;
@@ -215,8 +213,8 @@ void parser::init_FMap(std::shared_ptr<FunctionMap> FMap) { // have to hardcode 
 					}
 				} else {
 					if(newline) {
-						for(size_t i = 0; i< str.length() - 2; i++) {
-							std::cout << str[i];
+						for(size_t i_ = 0; i_ < str.length() - 2; i_++) {
+							std::cout << str[i_];
 						}
 						std::cout << std::endl;
 					} else {
