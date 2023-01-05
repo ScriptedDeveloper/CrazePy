@@ -25,29 +25,29 @@ std::vector<std::string> lexer::get_tokens() {
 			if(std::isalpha(c) || std::isdigit(c) || c == '(' || c == '\\') {
 				if(c == '(')  {
 					token.append(pot_operator + ")"); // using variable that is not designed for this purpose
-					add_token(tokens, token);
+					add_token(curr_tokens, token);
 					continue;
 				} 
 				token.push_back(c);
-				(token == "var") ? add_token(tokens, token) : void();
+				(token == "var") ? add_token(curr_tokens, token) : void();
 				continue;
 			} else if(parser::is_operator(pot_operator) || c == ' ') {
-				add_token(tokens, token);
-				tokens.push_back(pot_operator);
+				add_token(curr_tokens, token);
+				curr_tokens.push_back(pot_operator);
 				continue;
 			}
-			add_token(tokens, token);
+			add_token(curr_tokens, token);
 		}
-		tokens.push_back("\b"); // letting parser know that statement has ended, using backslash because script can contain \n
+		curr_tokens.push_back("\b"); // letting parser know that statement has ended, using backslash because script can contain \n
 	}
 	if(!token.empty()) {
 		if(tokens[tokens.size() - 1] == "\n") {
-			tokens.pop_back();
-			tokens.push_back(token);
-			tokens.push_back("\n");
+			curr_tokens.pop_back();
+			curr_tokens.push_back(token);
+			curr_tokens.push_back("\n");
 		}
 		else {
-			tokens.push_back(token);
+			curr_tokens.push_back(token);
 		}
 	}
 	this->tokens = curr_tokens;
