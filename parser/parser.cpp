@@ -5,7 +5,7 @@
 #include <variant>
 #include "parser.h"
 	
-parser::parser(std::vector<std::string> tokens_) : tokens(tokens_) {
+parser::parser(std::vector<std::string> tokens_) : vmap(), tokens(tokens_) {
 
 }
 
@@ -31,10 +31,16 @@ ArgVector parser::calc_args(ArgVector &args) {
 			} else { // ugly but it works for now
 				args[i] = std::to_string(x1 * x2);
 			}
-			
 			args.erase(args.begin() + i + 1);
 			args.erase(args.begin() + i - 1);
 			break;
+		} else {
+			if(std::holds_alternative<std::string>(x)) {
+				auto str = std::get<std::string>(x);
+				if(!std::all_of(str.begin(), str.end(), ::isalnum)) {
+					args[i] = ""; // emptying that member
+				}
+			}
 		}
 		i++;
 	}
@@ -42,29 +48,12 @@ ArgVector parser::calc_args(ArgVector &args) {
 }
 
 std::shared_ptr<AST> AST::add_node(std::string token, std::shared_ptr<AST> node) {
-	/*
-	std::shared_ptr<AST> next_t = std::make_shared<AST>();
-	if(!root.empty()) {
-		next_t->root = token; 
-		(left_node == nullptr) ? allocate_nodes() : void();
-		if(left_node->root.empty()) {
-			left_node.reset();
-			left_node = std::move(next_t);
-			return;
-		}
-		right_node.reset();
-		right_node = std::move(next_t);
-		return;
-	}
-	root = token;
-	*/
 	auto node_temp = node;
 	while(true) {
 		if(node_temp->root.empty()) {
 			node_temp->root = token;
 			break;
 		}
-	//	node_temp = (node_temp->left_node == nullptr || node_temp->left_node->root.empty()) ? node_temp->left_node : node_temp->right_node;
 		(node_temp->left_node == nullptr || node_temp->right_node == nullptr) ? allocate_nodes(node_temp) : void();
 		if(node_temp->left_node->root.empty()) {
 			node_temp = node_temp->left_node;
@@ -90,7 +79,7 @@ ArgVector AST::get_params(ArgVector params, std::shared_ptr<AST> root_ptr) {
 	if(root.empty() || root_ptr == nullptr) {
 		return {}; // returning nothing since invalid AST
 	}
-	while(params.size() <= root_ptr->nodes) {
+	while(params.size() < root_ptr->nodes) {
 		try {
 			if(!temp_ptr->read) { 
 				params.push_back(temp_ptr->root);
@@ -106,7 +95,8 @@ ArgVector AST::get_params(ArgVector params, std::shared_ptr<AST> root_ptr) {
 		} else {
 			temp_ptr = (temp_ptr->right_node == nullptr) ? previous_ptr->right_node : temp_ptr->right_node;
 		}
-	}
+	}	
+	parser::remove_space(params, ""); // removes only whitespaces
 	return params;
 }
 
@@ -122,6 +112,10 @@ ArgVector AST::get_params(ArgVector params, std::shared_ptr<AST> root_ptr) {
 
 bool parser::is_function(std::string token) {
 	return (token.find("(") == token.npos) ? false : true;
+}
+
+bool parser::is_var(std::string token) {
+	return token == "var";
 }
 
 bool parser::tree_is_full(std::shared_ptr<AST> single_t) {
@@ -163,26 +157,25 @@ std::vector<std::shared_ptr<AST>> parser::create_tree() {
 }
 
 void parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<FunctionMap> FMap) {
+	ArgVector temp_args, args;
 	for(std::shared_ptr<AST> s_tree : tree) {
 		if(is_function(s_tree->root)) {
 			std::string f_name = s_tree->root;
-			ArgVector temp_args, args;
-			auto next_tree = s_tree;
-			temp_args = next_tree->get_params(args, s_tree);
+			temp_args = s_tree->get_params(args, s_tree);
 			args = temp_args;
-			next_tree = (next_tree == s_tree->left_node || next_tree == nullptr) ? s_tree->right_node : s_tree->left_node;
 			args.erase(args.begin()); // emptying function call
-			args.erase(std::remove_if(args.begin(), args.end(), [](const auto& elm) {
-				if(std::holds_alternative<std::string>(elm)) {
-					return (std::get<std::string>(elm) == "") ? true : false;
-				}
-				return false;
-					}));
 			temp_args = args;
 			do {
 				args = calc_args(args);
 			} while(args.size() > 1 && temp_args != args);
 			call_function(FMap, f_name, args);
+		} else if(is_var(s_tree->root)) {
+			temp_args = args;
+			args = s_tree->get_params(args, s_tree);
+			remove_space(args, " "); // removes the whitespaces between vars definition
+			temp_args = calc_args(temp_args);
+			vmap[std::get<std::string>(args[1])] = (temp_args.empty()) ? args[3] : temp_args[0];
+			// either making it to the third member (the value of var) or assigning it to the only member of vector
 		}
 	}
 }

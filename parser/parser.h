@@ -1,12 +1,14 @@
 #pragma once
 #include <memory>
+#include <unordered_map>
 #include <map>
 #include <any>
 #include <variant>
 #include <functional>
 #include "../lexer/lexer.h"
 
-using ArgVector = std::vector<std::variant<std::string, int, bool, double, float>>;
+using ArgVector = std::vector<std::variant<std::string, int, bool, double, float, char>>;
+using VarMap = std::unordered_map<std::string, std::variant<std::string, int, bool, double, float, char>>;
 
 
 class AST {
@@ -25,11 +27,12 @@ class AST {
 
 class parser {
 	private:
-		
 		using FunctionMap = std::map<std::string, std::any>;
+		VarMap vmap;
 		std::vector<std::string> tokens;
-		ArgVector sort_tree(ArgVector args);
+		ArgVector replace_vars(ArgVector &args);
 		bool tree_is_full(std::shared_ptr<AST> single_t);
+		bool is_var(std::string token);
 		void init_FMap(std::shared_ptr<FunctionMap> FMap);
 		void print(ArgVector args);
 		static bool is_variant_int(std::variant<std::string, int, bool, double, float> i);
@@ -37,7 +40,7 @@ class parser {
 		void call_function(std::shared_ptr<FunctionMap> FMap, std::string func_name, P params);
 	public:
 		template <typename T>
-		static bool find_variant(ArgVector &args, T key);
+		static void remove_space(ArgVector &args, T space);
 		static bool is_operator(std::string token);
 		std::vector<std::shared_ptr<AST>> create_tree(); // pair because i wanna know the amount of nodes
 		void parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<FunctionMap> FMap);
@@ -57,11 +60,12 @@ void parser::call_function(std::shared_ptr<FunctionMap> FMap, std::string func_n
 }
 
 template <typename T>
-bool parser::find_variant(ArgVector &args, T key) {
-	return (std::find_if(args.begin(), args.end(), [&](const auto &arg) {
-		if(std::holds_alternative<T>(arg)) {
-			return std::get<T>(arg) == key;
-		}
-		return false;
-	}) == args.end()) ? true : false;
+void parser::remove_space(ArgVector &args, T space) {
+	args.push_back("");  // creating extra space if last member actually contains data
+	args.erase(std::remove_if(args.begin(), args.end(), [=](const auto& elm) {
+	if(std::holds_alternative<std::string>(elm)) {
+		return (std::get<std::string>(elm) == space) ? true : false;
+	}
+	return false;
+	}));
 }
