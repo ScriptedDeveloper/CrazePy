@@ -8,7 +8,7 @@ int main(int argc, char **argv) {
 		exit(0);
 	}
 	lexer l(argv[1]);
-	std::vector<std::string> test = l.get_tokens();
+	auto test = l.get_tokens();
 	parser p(l.tokens);
 	p.init_parser();
 	return 0;

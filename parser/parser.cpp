@@ -5,12 +5,11 @@
 #include <variant>
 #include "parser.h"
 	
-parser::parser(std::vector<std::string> tokens_) : vmap(), tokens(tokens_) {
+parser::parser(ArgVector &tokens_) : vmap(), tokens(tokens_) {
 
 }
 
-AST::AST() : nodes() {
-	root.clear();
+AST::AST() : root(), nodes() {
 }
 
 ArgVector parser::calc_args(ArgVector &args) {
@@ -19,17 +18,17 @@ ArgVector parser::calc_args(ArgVector &args) {
 		if(args.size() <= 1) { 
 			break;
 		}
-		if(is_operator(std::get<std::string>(x))) {
+		if(std::holds_alternative<std::string>(x) && is_operator(std::get<std::string>(x))) {
 			std::string op = std::get<std::string>(x);
-			auto x1 = std::atoi(std::get<std::string>(args[i - 1]).c_str()), x2 = std::atoi(std::get<std::string>(args[i + 1]).c_str());
+			auto x1 = std::get<int>((args[i - 1])), x2 = std::get<int>(args[i + 1]);
 			if(op == "+") {
-				args[i] = std::to_string(x1 + x2);
+				args[i] = x1 + x2;
 			} else if(op == "-") {
-				args[i] = std::to_string(x1 - x2);
+				args[i] = x1 - x2;
 			} else if(op == "/") {
-				args[i] = std::to_string(x1 / x2);
+				args[i] = x1 / x2;
 			} else { // ugly but it works for now
-				args[i] = std::to_string(x1 * x2);
+				args[i] = x1 * x2;
 			}
 			args.erase(args.begin() + i + 1);
 			args.erase(args.begin() + i - 1);
@@ -39,7 +38,7 @@ ArgVector parser::calc_args(ArgVector &args) {
 				auto str = std::get<std::string>(x);
 				if(!std::all_of(str.begin(), str.end(), ::isalnum)) {
 					args[i] = ""; // emptying that member
-				}
+				} 
 			}
 		}
 		i++;
@@ -47,15 +46,17 @@ ArgVector parser::calc_args(ArgVector &args) {
 	return args;
 }
 
-std::shared_ptr<AST> AST::add_node(std::string token, std::shared_ptr<AST> node) {
+std::shared_ptr<AST> AST::add_node(std::variant<std::string, int, bool, double, float, char> token, std::shared_ptr<AST> node) {
 	auto node_temp = node;
 	while(true) {
-		if(node_temp->root.empty()) {
+		auto root_str = node_temp->root;
+		if(node_temp->root.valueless_by_exception() || (std::holds_alternative<std::string>(root_str) && std::get<std::string>(root_str).empty())) {
 			node_temp->root = token;
 			break;
 		}
 		(node_temp->left_node == nullptr || node_temp->right_node == nullptr) ? allocate_nodes(node_temp) : void();
-		if(node_temp->left_node->root.empty()) {
+		auto left_node_str = node_temp->left_node->root;
+		if(left_node_str.valueless_by_exception() || (std::holds_alternative<std::string>(left_node_str) && std::get<std::string>(left_node_str).empty())) {
 			node_temp = node_temp->left_node;
 		} else {
 			node_temp = node_temp->right_node;
@@ -74,9 +75,10 @@ void AST::allocate_nodes(std::shared_ptr<AST> ptr) {
 	ptr->right_node = std::make_shared<AST>();
 }
 
-ArgVector AST::get_params(ArgVector params, std::shared_ptr<AST> root_ptr) {
+
+ArgVector AST::get_params(ArgVector &params, std::shared_ptr<AST> root_ptr) {
 	auto temp_ptr = root_ptr, previous_ptr = temp_ptr;	
-	if(root.empty() || root_ptr == nullptr) {
+	if(root.valueless_by_exception() || root_ptr == nullptr) {
 		return {}; // returning nothing since invalid AST
 	}
 	while(params.size() < root_ptr->nodes) {
@@ -89,14 +91,14 @@ ArgVector AST::get_params(ArgVector params, std::shared_ptr<AST> root_ptr) {
 				temp_ptr->read = true;
 			}
 		} catch(...) {}
-		if(temp_ptr->left_node != nullptr && !temp_ptr->left_node->root.empty()) {
+		if(temp_ptr->left_node != nullptr && !temp_ptr->left_node->root.valueless_by_exception()) {
 			previous_ptr = temp_ptr;
 			temp_ptr = temp_ptr->left_node;
 		} else {
 			temp_ptr = (temp_ptr->right_node == nullptr) ? previous_ptr->right_node : temp_ptr->right_node;
 		}
 	}	
-	parser::remove_space(params, ""); // removes only whitespaces
+	parser::remove_space(params, ' '); 
 	return params;
 }
 
@@ -120,7 +122,7 @@ bool parser::is_var(std::string token) {
 
 bool parser::tree_is_full(std::shared_ptr<AST> single_t) {
 	if(single_t != nullptr && single_t->left_node != nullptr && single_t->right_node != nullptr) {
-		return (!single_t->left_node->root.empty() && !single_t->right_node->root.empty() && !single_t->root.empty()) ? true : false;
+		return (!single_t->left_node->root.valueless_by_exception() && !single_t->right_node->root.valueless_by_exception() && !single_t->root.valueless_by_exception()) ? true : false;
 	}
 	return false;
 }
@@ -132,21 +134,11 @@ std::vector<std::shared_ptr<AST>> parser::create_tree() {
 	int i = 0;
 	for(auto token : tokens) {
 		single_t = (single_t == nullptr) ? std::make_shared<AST>() : single_t;
-		if(token == "\b") {
+		if(std::holds_alternative<std::string>(token) && std::get<std::string>(token) == "\b") {
 			single_t->nodes = i;
 			ast_vec.push_back(std::move(single_t));
 			single_t.reset();
 			i = 0;
-			continue;
-		}
-		if(single_t != nullptr && single_t->root.empty()) {
-			single_t->root = token; // setting function as root, if there is one
-			i++;
-			continue;
-		}	
-		if(tree_is_full(single_t)) {
-			single_t->add_node(token, single_t);
-			i++;
 			continue;
 		}
 		single_t->add_node(token, single_t);
@@ -159,23 +151,27 @@ std::vector<std::shared_ptr<AST>> parser::create_tree() {
 void parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<FunctionMap> FMap) {
 	ArgVector temp_args, args;
 	for(std::shared_ptr<AST> s_tree : tree) {
-		if(is_function(s_tree->root)) {
-			std::string f_name = s_tree->root;
-			temp_args = s_tree->get_params(args, s_tree);
-			args = temp_args;
+		auto is_str = std::holds_alternative<std::string>(s_tree->root);
+		std::string root;
+		root = (is_str) ? std::get<std::string>(s_tree->root) : root;
+		if(is_function(root)) {
+			std::string f_name = root;
+			args = s_tree->get_params(args, s_tree);
 			args.erase(args.begin()); // emptying function call
 			temp_args = args;
 			do {
 				args = calc_args(args);
 			} while(args.size() > 1 && temp_args != args);
 			call_function(FMap, f_name, args);
-		} else if(is_var(s_tree->root)) {
+			args.clear();
+		} else if(is_var(root)) {
 			temp_args = args;
 			args = s_tree->get_params(args, s_tree);
-			remove_space(args, " "); // removes the whitespaces between vars definition
+			remove_space(args, ' '); // removes the whitespaces between vars definition
 			temp_args = calc_args(temp_args);
 			vmap[std::get<std::string>(args[1])] = (temp_args.empty()) ? args[3] : temp_args[0];
 			// either making it to the third member (the value of var) or assigning it to the only member of vector
+			args.clear();
 		}
 	}
 }
