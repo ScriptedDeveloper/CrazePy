@@ -76,7 +76,7 @@ void AST::allocate_nodes(std::shared_ptr<AST> ptr) {
 }
 
 
-ArgVector AST::get_params(ArgVector &params, std::shared_ptr<AST> root_ptr) {
+ArgVector AST::get_params(ArgVector &params, std::shared_ptr<AST> root_ptr, const VarMap &vmap) {
 	auto temp_ptr = root_ptr, previous_ptr = temp_ptr;	
 	if(root.valueless_by_exception() || root_ptr == nullptr) {
 		return {}; // returning nothing since invalid AST
@@ -99,6 +99,17 @@ ArgVector AST::get_params(ArgVector &params, std::shared_ptr<AST> root_ptr) {
 		}
 	}	
 	parser::remove_space(params, ' '); 
+	int it = 0;
+	for(auto i : params) {
+		if(std::holds_alternative<std::string>(i)) {
+			for(auto x : vmap) {
+				if(x.first == std::get<std::string>(i)) {
+					params[it] = x.second; // replacing var with value
+				}
+			}
+		}
+		it++;
+	}
 	return params;
 }
 
@@ -156,7 +167,7 @@ void parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<
 		root = (is_str) ? std::get<std::string>(s_tree->root) : root;
 		if(is_function(root)) {
 			std::string f_name = root;
-			args = s_tree->get_params(args, s_tree);
+			args = s_tree->get_params(args, s_tree, vmap);
 			args.erase(args.begin()); // emptying function call
 			temp_args = args;
 			do {
@@ -166,7 +177,7 @@ void parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<
 			args.clear();
 		} else if(is_var(root)) {
 			temp_args = args;
-			args = s_tree->get_params(args, s_tree);
+			args = s_tree->get_params(args, s_tree, vmap);
 			remove_space(args, ' '); // removes the whitespaces between vars definition
 			temp_args = calc_args(temp_args);
 			vmap[std::get<std::string>(args[1])] = (temp_args.empty()) ? args[3] : temp_args[0];

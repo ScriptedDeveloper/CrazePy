@@ -19,7 +19,7 @@ class AST {
 		bool read = false; // for parsing the tree to check if it has been read or not
 		std::shared_ptr<AST> left_node{}; // like a binary tree
 		void allocate_nodes(std::shared_ptr<AST> ptr = nullptr);
-		ArgVector get_params(ArgVector &params, std::shared_ptr<AST> root);
+		ArgVector get_params(ArgVector &params, std::shared_ptr<AST> root, const VarMap &vmap);
 		std::shared_ptr<AST> right_node{};
 		AST();
 	private:
