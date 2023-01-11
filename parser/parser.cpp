@@ -113,7 +113,7 @@ ArgVector AST::get_params(ArgVector &params, std::shared_ptr<AST> root_ptr, cons
 	return params;
 }
 
- bool parser::is_operator(std::string token) {
+bool parser::is_operator(std::string token) {
 	const std::vector<std::string> ops = {"=", "/", "+", "-", "*"}; // treating char as string because token is string too
 	for(std::string op : ops) {
 		if(op == token) {
@@ -121,6 +121,26 @@ ArgVector AST::get_params(ArgVector &params, std::shared_ptr<AST> root_ptr, cons
 		}
 	}
 	return false;
+}
+
+bool parser::compare_values(ArgVector &args) {
+	if(args.size() <= 2) {
+		return false; // wrong if statement
+	}
+	args.erase(args.begin());
+	args.erase(args.begin() + 1, args.begin() + 3); // removing first 2 if and ==
+	auto val = args[0];
+	for(auto i : args) {
+		// doing iteration to check if its variable, later
+		if(i == val) {
+			return true;
+		}
+	}
+	return false;
+}
+
+bool parser::is_if_statement(std::string token) {
+	return token == "if";
 }
 
 bool parser::is_function(std::string token) {
@@ -183,6 +203,11 @@ void parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<
 			vmap[std::get<std::string>(args[1])] = (temp_args.empty()) ? args[3] : temp_args[0];
 			// either making it to the third member (the value of var) or assigning it to the only member of vector
 			args.clear();
+		} else if(is_if_statement(root)) {
+			args = s_tree->get_params(args, s_tree, vmap);
+			if(args.empty())
+				exit(1); // exitting, invalid if statement.
+			 //compare_values(args);
 		}
 	}
 }

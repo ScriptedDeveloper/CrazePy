@@ -10,7 +10,6 @@
 using ArgVector = std::vector<std::variant<std::string, int, bool, double, float, char>>;
 using VarMap = std::unordered_map<std::string, std::variant<std::string, int, bool, double, float, char>>;
 
-
 class AST {
 	public:	
 		std::shared_ptr<AST> add_node(std::variant<std::string, int, bool, double, float, char> token, std::shared_ptr<AST> node);
@@ -35,10 +34,11 @@ class parser {
 		ArgVector tokens;
 		ArgVector replace_vars(ArgVector &args);
 		bool tree_is_full(std::shared_ptr<AST> single_t);
+		bool compare_values(ArgVector &args);
 		bool is_var(std::string token);
+		bool is_if_statement(std::string token);
 		void init_FMap(std::shared_ptr<FunctionMap> FMap);
 		void print(ArgVector &args);
-		static bool is_variant_int(std::variant<std::string, int, bool, double, float> i);
 		template <typename P>
 		void call_function(std::shared_ptr<FunctionMap> FMap, std::string func_name, P params);
 	public:
@@ -46,6 +46,7 @@ class parser {
 		static void remove_space(ArgVector &args, const T &space);
 		static bool is_operator(std::string token);
 		static bool is_function(std::string token);
+		static bool is_variant_int(std::variant<std::string, int, bool, double, float> i);
 		std::vector<std::shared_ptr<AST>> create_tree(); // pair because i wanna know the amount of nodes
 		void parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<FunctionMap> FMap);
 		void init_parser();
@@ -64,7 +65,7 @@ void parser::call_function(std::shared_ptr<FunctionMap> FMap, std::string func_n
 
 template <typename T>
 void parser::remove_space(ArgVector &args, const T &space) {
-    args.erase(std::remove_if(args.begin(), args.end(), [&](const auto& elm) {
+	args.erase(std::remove_if(args.begin(), args.end(), [&](const auto& elm) {
         return (std::holds_alternative<std::string>(elm) && std::all_of(std::get<std::string>(elm).begin(), std::get<std::string>(elm).end(), [&](char ch) { return (space != '\0') ? ch == space : true; }));
     }), args.end());
 }

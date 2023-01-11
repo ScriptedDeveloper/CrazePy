@@ -26,7 +26,9 @@ ArgVector lexer::get_tokens() {
 	std::string token, line;
 	ArgVector curr_tokens;
 	while(std::getline(ifs, line)) {
-		(line[line.length() - 1] != ';') ? exit(1) : void(); // right now just simply exit, will do error handeling properly l8ter
+		char last_c = (line.length() <= 1) ? line[0] : line[line.length() - 1];
+		(last_c != ';' && last_c != '{' && last_c != '}'
+		 && last_c != '\0' && last_c != ' ') ? exit(1) : void(); // right now just simply exit, will do error handeling properly l8ter
 		bool is_string = false;
 		for(char c : line) {
 			std::string pot_operator = std::string(1, c);
