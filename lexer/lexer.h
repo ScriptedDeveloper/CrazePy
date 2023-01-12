@@ -7,10 +7,10 @@ using ArgVector = std::vector<std::variant<std::string, int, bool, double, float
 
 class lexer {
 	private:
-		std::string name;
 		void add_token(ArgVector &curr_tokens, std::string &token);
 	public:
+		std::string name;
 		ArgVector tokens;
 		lexer(std::string filename);
-		ArgVector get_tokens();
+		ArgVector get_tokens(int EIP = 0);
 };

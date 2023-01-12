@@ -9,7 +9,7 @@ int main(int argc, char **argv) {
 	}
 	lexer l(argv[1]);
 	auto test = l.get_tokens();
-	parser p(l.tokens);
+	parser p(l.tokens, l.name);
 	p.init_parser();
 	return 0;
 }

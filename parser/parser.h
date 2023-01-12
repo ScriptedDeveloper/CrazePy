@@ -31,6 +31,7 @@ class parser {
 	private:
 		using FunctionMap = std::map<std::string, std::any>;
 		VarMap vmap;
+		std::string file_name;
 		ArgVector tokens;
 		ArgVector replace_vars(ArgVector &args);
 		bool tree_is_full(std::shared_ptr<AST> single_t);
@@ -41,7 +42,10 @@ class parser {
 		void print(ArgVector &args);
 		template <typename P>
 		void call_function(std::shared_ptr<FunctionMap> FMap, std::string func_name, P params);
+		
 	public:
+		template <typename T>
+		static auto replace_variable(T &var, const VarMap &vmap);
 		template <typename T>
 		static void remove_space(ArgVector &args, const T &space);
 		static bool is_operator(std::string token);
@@ -51,7 +55,7 @@ class parser {
 		void parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<FunctionMap> FMap);
 		void init_parser();
 		static ArgVector calc_args(ArgVector &args); // for expressions like 1+1 or Hello + World
-		parser(ArgVector &tokens_);
+		parser(ArgVector &tokens_, std::string &fname);
 
 };
 
@@ -68,6 +72,16 @@ void parser::remove_space(ArgVector &args, const T &space) {
 	args.erase(std::remove_if(args.begin(), args.end(), [&](const auto& elm) {
         return (std::holds_alternative<std::string>(elm) && std::all_of(std::get<std::string>(elm).begin(), std::get<std::string>(elm).end(), [&](char ch) { return (space != '\0') ? ch == space : true; }));
     }), args.end());
+}
+
+template <typename T>
+auto parser::replace_variable(T &var, const VarMap &vmap) {	
+	for(auto x : vmap) {
+		if(x.first == std::get<std::string>(var)) {
+			var = x.second; // replacing var with value
+		}
+	}
+	return var;
 }
 
 /*

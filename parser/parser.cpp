@@ -5,8 +5,8 @@
 #include <variant>
 #include "parser.h"
 	
-parser::parser(ArgVector &tokens_) : vmap(), tokens(tokens_) {
-
+parser::parser(ArgVector &tokens_, std::string &fname) : vmap(), file_name(), tokens(tokens_) {
+	file_name = fname;
 }
 
 AST::AST() : root(), nodes() {
@@ -102,11 +102,7 @@ ArgVector AST::get_params(ArgVector &params, std::shared_ptr<AST> root_ptr, cons
 	int it = 0;
 	for(auto i : params) {
 		if(std::holds_alternative<std::string>(i)) {
-			for(auto x : vmap) {
-				if(x.first == std::get<std::string>(i)) {
-					params[it] = x.second; // replacing var with value
-				}
-			}
+			params[it] = parser::replace_variable(i, vmap);
 		}
 		it++;
 	}
@@ -130,11 +126,11 @@ bool parser::compare_values(ArgVector &args) {
 	args.erase(args.begin());
 	args.erase(args.begin() + 1, args.begin() + 3); // removing first 2 if and ==
 	auto val = args[0];
+	int it = 0;
 	for(auto i : args) {
-		// doing iteration to check if its variable, later
-		if(i == val) {
+		if(i == val && it > 0)
 			return true;
-		}
+		it++;
 	}
 	return false;
 }
@@ -181,6 +177,7 @@ std::vector<std::shared_ptr<AST>> parser::create_tree() {
 
 void parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<FunctionMap> FMap) {
 	ArgVector temp_args, args;
+	int EIP = 0;
 	for(std::shared_ptr<AST> s_tree : tree) {
 		auto is_str = std::holds_alternative<std::string>(s_tree->root);
 		std::string root;
@@ -207,8 +204,15 @@ void parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<
 			args = s_tree->get_params(args, s_tree, vmap);
 			if(args.empty())
 				exit(1); // exitting, invalid if statement.
-			 //compare_values(args);
+			if(compare_values(args)) {
+				EIP++; // jumping to if statement block
+				lexer lex_if(file_name);
+				lex_if.get_tokens(EIP);
+				parser parse_if(lex_if.tokens, file_name);
+				parse_if.init_parser(); // bad practice, if too much nested loops, STACKOVERFLOW! have to change l8ter
+			}
 		}
+		EIP++;
 	}
 }
 

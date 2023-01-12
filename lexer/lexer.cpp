@@ -21,15 +21,29 @@ void lexer::add_token(ArgVector &curr_tokens, std::string &token) {
 	token.clear();
 }
 
-ArgVector lexer::get_tokens() {
+ArgVector lexer::get_tokens(int EIP) {
 	std::ifstream ifs(this->name);
 	std::string token, line;
 	ArgVector curr_tokens;
+	bool is_eip = (EIP > 0) ? true : false, is_code_block = false;
 	while(std::getline(ifs, line)) {
+		if(is_eip && line.find("}") != line.npos)
+			break; //  end of if block
+		if(is_code_block) { // skip code block
+			is_code_block = (line.find("}") != line.npos) ? false : true;
+			continue;
+		}
 		char last_c = (line.length() <= 1) ? line[0] : line[line.length() - 1];
 		(last_c != ';' && last_c != '{' && last_c != '}'
 		 && last_c != '\0' && last_c != ' ') ? exit(1) : void(); // right now just simply exit, will do error handeling properly l8ter
 		bool is_string = false;
+		if(EIP > 0) {
+			EIP--;
+			continue;
+		}
+		if((EIP == 0 && line.find("{") != line.npos)) { // dont get tokens of code blocks (if statements etc)
+			is_code_block = true;
+		}
 		for(char c : line) {
 			std::string pot_operator = std::string(1, c);
 			if((std::isalpha(c) || std::isdigit(c) || c == '(' || c == '\\') && !is_string) {
