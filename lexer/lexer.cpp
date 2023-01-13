@@ -33,9 +33,9 @@ ArgVector lexer::get_tokens(int EIP) {
 			is_code_block = (line.find("}") != line.npos) ? false : true;
 			continue;
 		}
-		char last_c = (line.length() <= 1) ? line[0] : line[line.length() - 1];
-		(last_c != ';' && last_c != '{' && last_c != '}'
-		 && last_c != '\0' && last_c != ' ') ? exit(1) : void(); // right now just simply exit, will do error handeling properly l8ter
+		if(line.find(";") != line.npos && line.find("{") != line.npos && line.find("}") != line.npos
+		 && line.find("\0") != line.npos && line.find(" ") != line.npos)
+			exit(1); // right now just simply exit, will do error handeling properly l8ter
 		bool is_string = false;
 		if(EIP > 0) {
 			EIP--;
@@ -66,13 +66,16 @@ ArgVector lexer::get_tokens(int EIP) {
 			else if(is_string) {
 				token.push_back(c);
 				continue;
-			} else if(parser::is_operator(pot_operator) || c == ' ') {
+			} else if(c == '#')
+				continue; // current line is a comment
+			else if(parser::is_operator(pot_operator) || c == ' ') {
 				add_token(curr_tokens, token);
 				curr_tokens.push_back(pot_operator);
 				continue;
 			}
 			add_token(curr_tokens, token);
 		}
+		(token.empty()) ? void() : add_token(curr_tokens, token);  // adding last token to vector, wasn't added. probably because of empty comment
 		curr_tokens.push_back("\b"); // letting parser know that statement has ended, using backslash because script can contain \n
 	}
 	if(!token.empty()) {
