@@ -191,7 +191,6 @@ void parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<
 				args = calc_args(args);
 			} while(args.size() > 1 && temp_args != args);
 			call_function(FMap, f_name, args);
-			args.clear();
 		} else if(is_var(root)) {
 			temp_args = args;
 			args = s_tree->get_params(args, s_tree, vmap);
@@ -199,7 +198,6 @@ void parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<
 			temp_args = calc_args(temp_args);
 			vmap[std::get<std::string>(args[1])] = (temp_args.empty()) ? args[3] : temp_args[0];
 			// either making it to the third member (the value of var) or assigning it to the only member of vector
-			args.clear();
 		} else if(is_if_statement(root)) {
 			args = s_tree->get_params(args, s_tree, vmap);
 			if(args.empty())
@@ -212,6 +210,7 @@ void parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<
 				parse_if.init_parser(); // bad practice, if too much nested loops, STACKOVERFLOW! have to change l8ter
 			}
 		}
+		args.clear();
 		EIP++;
 	}
 }
