@@ -5,7 +5,7 @@
 #include <variant>
 #include "parser.h"
 	
-parser::parser(ArgVector &tokens_, std::string &fname) : vmap(), file_name(), tokens(tokens_) {
+parser::parser(ArgVector &tokens_, std::string &fname, VarMap vmap_pass) : vmap(vmap_pass), file_name(), tokens(tokens_)  {
 	file_name = fname;
 }
 
@@ -206,7 +206,7 @@ void parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<
 				EIP++; // jumping to if statement block
 				lexer lex_if(file_name);
 				lex_if.get_tokens(EIP);
-				parser parse_if(lex_if.tokens, file_name);
+				parser parse_if(lex_if.tokens, file_name, vmap);
 				parse_if.init_parser(); // bad practice, if too much nested loops, STACKOVERFLOW! have to change l8ter
 			}
 		}

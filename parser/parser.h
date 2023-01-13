@@ -55,7 +55,7 @@ class parser {
 		void parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<FunctionMap> FMap);
 		void init_parser();
 		static ArgVector calc_args(ArgVector &args); // for expressions like 1+1 or Hello + World
-		parser(ArgVector &tokens_, std::string &fname);
+		parser(ArgVector &tokens_, std::string &fname, VarMap vmap_pass = {});
 
 };
 
