@@ -53,7 +53,7 @@ ArgVector lexer::get_tokens() {
 				token.push_back(c);
 				continue;
 			} else if(c == '#')
-				continue; // current line is a comment
+				break; // current line is a comment
 			else if(parser::is_operator(pot_operator) || c == ' ') {
 				add_token(curr_tokens, token);
 				curr_tokens.push_back(pot_operator);

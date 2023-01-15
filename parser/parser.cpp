@@ -231,6 +231,7 @@ void parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<
 				args = calc_args(args);
 			} while(args.size() > 1 && temp_args != args);
 			call_function(FMap, f_name, args);
+			temp_args.clear();
 		} else if(is_var(root)) {
 			remove_space(args, ' '); // removes the whitespaces between vars definition
 			args = calc_args(args);
