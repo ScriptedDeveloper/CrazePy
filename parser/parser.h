@@ -42,7 +42,7 @@ class parser {
 		void print(ArgVector &args);
 		template <typename P>
 		void call_function(std::shared_ptr<FunctionMap> FMap, std::string func_name, P params);
-		
+		bool contains_args(ArgVector &args, std::variant<std::string, int, bool, double, float, char> keyword);
 	public:
 		template <typename T>
 		static auto replace_variable(T &var, const VarMap &vmap);

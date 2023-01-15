@@ -12,5 +12,5 @@ class lexer {
 		std::string name;
 		ArgVector tokens;
 		lexer(std::string filename);
-		ArgVector get_tokens(int EIP = 0);
+		ArgVector get_tokens();
 };
