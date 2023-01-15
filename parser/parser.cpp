@@ -12,8 +12,21 @@ parser::parser(ArgVector &tokens_, std::string &fname, VarMap vmap_pass) : vmap(
 AST::AST() : root(), nodes() {
 }
 
+bool parser::has_one_value(const ArgVector &args) {
+	int i = 0;
+	for(auto x : args) {
+		if(std::holds_alternative<int>(x))
+			i++;
+		if(i == 2)
+			return false;
+	}
+	return true;
+}
+
 ArgVector parser::calc_args(ArgVector &args) {
 	int i = 0;
+	if(has_one_value(args))
+		return args; // only has one value, no need to do anything
 	for(auto x : args) {	
 		if(args.size() <= 1) { 
 			break;
@@ -76,7 +89,7 @@ void AST::allocate_nodes(std::shared_ptr<AST> ptr) {
 }
 
 
-ArgVector AST::get_params(ArgVector &params, std::shared_ptr<AST> root_ptr, const VarMap &vmap) {
+ArgVector AST::get_params(ArgVector &params, std::shared_ptr<AST> root_ptr, VarMap *vmap) {
 	auto temp_ptr = root_ptr, previous_ptr = temp_ptr;	
 	if(root.valueless_by_exception() || root_ptr == nullptr) {
 		return {}; // returning nothing since invalid AST
@@ -102,7 +115,7 @@ ArgVector AST::get_params(ArgVector &params, std::shared_ptr<AST> root_ptr, cons
 	int it = 0;
 	for(auto i : params) {
 		if(std::holds_alternative<std::string>(i)) {
-			params[it] = parser::replace_variable(i, vmap);
+			params[it] = parser::replace_variable(i, *vmap);
 		}
 		it++;
 	}
@@ -187,16 +200,25 @@ void parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<
 	ArgVector temp_args, args;
 	std::pair<bool, bool> is_if_is_else = {false, false}; // first : is_if, second : is_else
 	bool end_block = false; // checks whether if/else block ended
+	VarMap vmap_block; // vmap_block is for local variables declared in a if/else block or later functions
+	VarMap *vmap_ptr;
 	for(std::shared_ptr<AST> s_tree : tree) {
-		args = s_tree->get_params(args, s_tree, vmap);
+		args = s_tree->get_params(args, s_tree, (vmap_ptr == nullptr) ? &vmap : vmap_ptr);
 		if(is_if_is_else.first) {
-			is_if_is_else.first = (contains_args(args, "{")) ? false : true;
+			vmap_ptr = &vmap_block;
+			//is_if_is_else.first = (contains_args(args, "{") || contains_args(args, "}")) ? false : true;
+			is_if_is_else.first = (contains_args(args, "}")) ? false : true;
 		} else if(is_if_is_else.second && !end_block) {
+			vmap_ptr = &vmap_block;
 			if(contains_args(args, "}")) {
 				end_block = true;
 			}
 			args.clear();
 			continue;
+		}
+		if(!is_if_is_else.first && !is_if_is_else.second) {
+			vmap_block.clear();
+			vmap_ptr = &vmap;
 		}
 		auto is_str = std::holds_alternative<std::string>(s_tree->root);
 		std::string root;
@@ -210,10 +232,9 @@ void parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<
 			} while(args.size() > 1 && temp_args != args);
 			call_function(FMap, f_name, args);
 		} else if(is_var(root)) {
-			temp_args = args;
 			remove_space(args, ' '); // removes the whitespaces between vars definition
-			temp_args = calc_args(temp_args);
-			vmap[std::get<std::string>(args[1])] = (temp_args.empty()) ? args[3] : temp_args[0];
+			args = calc_args(args);
+			(*vmap_ptr)[std::get<std::string>(args[1])] = (temp_args.empty()) ? args[3] : temp_args[0];
 			// either making it to the third member (the value of var) or assigning it to the only member of vector
 		} else if(is_if_statement(root)) {
 			if(args.empty())
