@@ -12,8 +12,21 @@ parser::parser(ArgVector &tokens_, std::string &fname, VarMap vmap_pass) : vmap(
 AST::AST() : root(), nodes() {
 }
 
+bool parser::has_one_value(const ArgVector &args) {
+	int i = 0;
+	for(auto x : args) {
+		if(std::holds_alternative<int>(x))
+			i++;
+		if(i == 2)
+			return false;
+	}
+	return true;
+}
+
 ArgVector parser::calc_args(ArgVector &args) {
 	int i = 0;
+	if(has_one_value(args))
+		return args; // only has one value, no need to do anything
 	for(auto x : args) {	
 		if(args.size() <= 1) { 
 			break;
@@ -76,7 +89,7 @@ void AST::allocate_nodes(std::shared_ptr<AST> ptr) {
 }
 
 
-ArgVector AST::get_params(ArgVector &params, std::shared_ptr<AST> root_ptr, const VarMap &vmap) {
+ArgVector AST::get_params(ArgVector &params, std::shared_ptr<AST> root_ptr, VarMap *vmap) {
 	auto temp_ptr = root_ptr, previous_ptr = temp_ptr;	
 	if(root.valueless_by_exception() || root_ptr == nullptr) {
 		return {}; // returning nothing since invalid AST
@@ -102,7 +115,7 @@ ArgVector AST::get_params(ArgVector &params, std::shared_ptr<AST> root_ptr, cons
 	int it = 0;
 	for(auto i : params) {
 		if(std::holds_alternative<std::string>(i)) {
-			params[it] = parser::replace_variable(i, vmap);
+			params[it] = parser::replace_variable(i, *vmap);
 		}
 		it++;
 	}
@@ -136,7 +149,7 @@ bool parser::compare_values(ArgVector &args) {
 }
 
 bool parser::is_if_statement(std::string token) {
-	return token == "if";
+	return token == "if" || "else";
 }
 
 bool parser::is_function(std::string token) {
@@ -145,6 +158,14 @@ bool parser::is_function(std::string token) {
 
 bool parser::is_var(std::string token) {
 	return token == "var";
+}
+
+bool parser::contains_args(ArgVector &args, std::variant<std::string, int, bool, double, float, char> keyword) {
+	for(auto i : args) {
+		if(i == keyword)
+			return true;
+	}
+	return false;
 }
 
 bool parser::tree_is_full(std::shared_ptr<AST> single_t) {
@@ -177,41 +198,55 @@ std::vector<std::shared_ptr<AST>> parser::create_tree() {
 
 void parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<FunctionMap> FMap) {
 	ArgVector temp_args, args;
-	int EIP = 0;
+	std::pair<bool, bool> is_if_is_else = {false, false}; // first : is_if, second : is_else
+	bool end_block = false; // checks whether if/else block ended
+	VarMap vmap_block; // vmap_block is for local variables declared in a if/else block or later functions
+	VarMap *vmap_ptr;
 	for(std::shared_ptr<AST> s_tree : tree) {
+		args = s_tree->get_params(args, s_tree, (vmap_ptr == nullptr) ? &vmap : vmap_ptr);
+		if(is_if_is_else.first) {
+			vmap_ptr = &vmap_block;
+			//is_if_is_else.first = (contains_args(args, "{") || contains_args(args, "}")) ? false : true;
+			is_if_is_else.first = (contains_args(args, "}")) ? false : true;
+		} else if(is_if_is_else.second && !end_block) {
+			vmap_ptr = &vmap_block;
+			if(contains_args(args, "}")) {
+				end_block = true;
+			}
+			args.clear();
+			continue;
+		}
+		if(!is_if_is_else.first && !is_if_is_else.second) {
+			vmap_block.clear();
+			vmap_ptr = &vmap;
+		}
 		auto is_str = std::holds_alternative<std::string>(s_tree->root);
 		std::string root;
 		root = (is_str) ? std::get<std::string>(s_tree->root) : root;
 		if(is_function(root)) {
 			std::string f_name = root;
-			args = s_tree->get_params(args, s_tree, vmap);
 			args.erase(args.begin()); // emptying function call
 			temp_args = args;
 			do {
 				args = calc_args(args);
 			} while(args.size() > 1 && temp_args != args);
 			call_function(FMap, f_name, args);
+			temp_args.clear();
 		} else if(is_var(root)) {
-			temp_args = args;
-			args = s_tree->get_params(args, s_tree, vmap);
 			remove_space(args, ' '); // removes the whitespaces between vars definition
-			temp_args = calc_args(temp_args);
-			vmap[std::get<std::string>(args[1])] = (temp_args.empty()) ? args[3] : temp_args[0];
+			args = calc_args(args);
+			(*vmap_ptr)[std::get<std::string>(args[1])] = (temp_args.empty()) ? args[3] : temp_args[0];
 			// either making it to the third member (the value of var) or assigning it to the only member of vector
 		} else if(is_if_statement(root)) {
-			args = s_tree->get_params(args, s_tree, vmap);
 			if(args.empty())
 				exit(1); // exitting, invalid if statement.
-			if(compare_values(args)) {
-				EIP++; // jumping to if statement block
-				lexer lex_if(file_name);
-				lex_if.get_tokens(EIP);
-				parser parse_if(lex_if.tokens, file_name, vmap);
-				parse_if.init_parser(); // bad practice, if too much nested loops, STACKOVERFLOW! have to change l8ter
+			if(!compare_values(args) && !is_if_is_else.second) { 
+				is_if_is_else = {false, true}; // setting else_if true, because if statement is false
+			} else { 
+				is_if_is_else = {true, false}; // opposite here
 			}
 		}
 		args.clear();
-		EIP++;
 	}
 }
 
