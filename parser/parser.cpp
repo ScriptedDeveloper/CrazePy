@@ -33,7 +33,12 @@ ArgVector parser::calc_args(ArgVector &args) {
 		}
 		if(std::holds_alternative<std::string>(x) && is_operator(std::get<std::string>(x))) {
 			std::string op = std::get<std::string>(x);
-			auto x1 = std::get<int>((args[i - 1])), x2 = std::get<int>(args[i + 1]);
+			int x1, x2;
+			try {
+				x1 = std::get<int>((args[i - 1])), x2 = std::get<int>(args[i + 1]);
+			} catch(const std::bad_variant_access&) {
+				return args; // no arithmatic operation involved
+			}
 			if(op == "+") {
 				args[i] = x1 + x2;
 			} else if(op == "-") {
@@ -149,7 +154,7 @@ bool parser::compare_values(ArgVector &args) {
 }
 
 bool parser::is_if_statement(std::string token) {
-	return token == "if" || "else" || "elif";
+	return token == "if" || token == "else" || token == "elif";
 }
 
 bool parser::is_function(std::string token) {
@@ -240,6 +245,7 @@ void parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<
 		} else if(is_if_statement(root)) {
 			if(args.empty())
 				exit(1); // exitting, invalid if statement.
+			calc_args(args);
 			if(!compare_values(args) && !is_if_is_else.second) { 
 				is_if_is_else = {false, true}; // setting else_if true, because if statement is false
 			} else { 

@@ -49,7 +49,7 @@ ArgVector lexer::get_tokens() {
 					continue;
 				token.append("\\s"); // marking var as string
 			}
-			else if(is_string) {
+			else if(is_string || c == '!') {
 				token.push_back(c);
 				continue;
 			} else if(c == '#')
