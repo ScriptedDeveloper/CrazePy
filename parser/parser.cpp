@@ -149,7 +149,7 @@ bool parser::compare_values(ArgVector &args) {
 }
 
 bool parser::is_if_statement(std::string token) {
-	return token == "if" || "else";
+	return token == "if" || "else" || "elif";
 }
 
 bool parser::is_function(std::string token) {
