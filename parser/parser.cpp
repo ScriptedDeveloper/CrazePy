@@ -204,7 +204,6 @@ std::vector<std::shared_ptr<AST>> parser::create_tree() {
 void parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<FunctionMap> FMap) {
 	ArgVector temp_args, args;
 	std::pair<bool, bool> is_if_is_else = {false, false}; // first : is_if, second : is_else
-	bool end_block = false; // checks whether if/else block ended
 	VarMap vmap_block; // vmap_block is for local variables declared in a if/else block or later functions
 	VarMap *vmap_ptr;
 	for(std::shared_ptr<AST> s_tree : tree) {
@@ -213,10 +212,11 @@ void parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<
 			vmap_ptr = &vmap_block;
 			//is_if_is_else.first = (contains_args(args, "{") || contains_args(args, "}")) ? false : true;
 			is_if_is_else.first = (contains_args(args, "}")) ? false : true;
-		} else if(is_if_is_else.second && !end_block) {
+		} else if(is_if_is_else.second) {
 			vmap_ptr = &vmap_block;
 			if(contains_args(args, "}")) {
-				end_block = true;
+				is_if_is_else.second = false;
+				vmap_ptr = &vmap;
 			}
 			args.clear();
 			continue;
