@@ -30,11 +30,14 @@ class AST {
 class parser {
 	private:
 		using FunctionMap = std::map<std::string, std::any>;
-		VarMap vmap;
 		std::string file_name;
 		ArgVector tokens;
 		ArgVector replace_vars(ArgVector &args);
 		bool tree_is_full(std::shared_ptr<AST> single_t);
+		template <typename T>
+		void erase_key(T &args, std::string key);
+		template<typename T>
+		VarMap get_vmap(T arr);
 		static bool has_one_value(const ArgVector &args);
 		bool compare_values(ArgVector &args);
 		bool is_var(std::string token);
@@ -56,12 +59,12 @@ class parser {
 		void parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<FunctionMap> FMap);
 		void init_parser();
 		static ArgVector calc_args(ArgVector &args); // for expressions like 1+1 or Hello + World
-		parser(ArgVector &tokens_, std::string &fname, VarMap vmap_pass = {});
+		parser(ArgVector &tokens_, std::string &fname);
 
 };
 
 // have to implement some kind of data structure to save function return values or parameters to access them l8ter.. but this is good for now
-template <typename  P>
+template <typename P>
 void parser::call_function(std::shared_ptr<FunctionMap> FMap, std::string func_name, P params) {
 	std::any& any = (*FMap)[func_name];
 	auto function = std::any_cast<std::function<void(P &params)>>(any);
@@ -83,6 +86,26 @@ auto parser::replace_variable(T &var, const VarMap &vmap) {
 		}
 	}
 	return var;
+}
+
+template <typename T>
+VarMap parser::get_vmap(T arr) {
+	VarMap vmap_all; // putting local as well as global variables into a single map
+	for(auto i : arr)
+		vmap_all.insert(i->begin(), i->end());
+	return vmap_all;
+}
+
+template <typename T>
+void parser::erase_key(T &args, std::string key) {
+	int it = 0;
+	for(auto i : args) {
+		if(std::holds_alternative<std::string>(i) && std::get<std::string>(i) == key) {
+			args.erase(args.begin() + it);
+			return;
+		}
+		it++;
+	}
 }
 
 /*

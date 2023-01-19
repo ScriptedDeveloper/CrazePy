@@ -5,7 +5,7 @@
 #include <variant>
 #include "parser.h"
 	
-parser::parser(ArgVector &tokens_, std::string &fname, VarMap vmap_pass) : vmap(vmap_pass), file_name(), tokens(tokens_)  {
+parser::parser(ArgVector &tokens_, std::string &fname) : file_name(), tokens(tokens_)  {
 	file_name = fname;
 }
 
@@ -180,6 +180,7 @@ bool parser::tree_is_full(std::shared_ptr<AST> single_t) {
 	return false;
 }
 
+
 std::vector<std::shared_ptr<AST>> parser::create_tree() {
 	std::vector<std::shared_ptr<AST>> ast_vec{};
 	auto single_t = std::make_shared<AST>();
@@ -204,30 +205,38 @@ std::vector<std::shared_ptr<AST>> parser::create_tree() {
 void parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<FunctionMap> FMap) {
 	ArgVector temp_args, args;
 	std::pair<bool, bool> is_if_is_else = {false, false}; // first : is_if, second : is_else
-	VarMap vmap_block; // vmap_block is for local variables declared in a if/else block or later functions
-	VarMap *vmap_ptr;
+	bool is_str = false, is_elif = false; // this is for elif statements, not like above for else statements
+	VarMap vmap_block, vmap_all, vmap_global; // vmap_block is for local variables declared in a if/else block or later functions, see get_vmap() for vmap_all usage
+	std::array<VarMap*, 2> vmap_arr = {&vmap_block, &vmap_global};
+	std::string root;
 	for(std::shared_ptr<AST> s_tree : tree) {
-		args = s_tree->get_params(args, s_tree, (vmap_ptr == nullptr) ? &vmap : vmap_ptr);
+		vmap_all = get_vmap(vmap_arr);
+		args = s_tree->get_params(args, s_tree,  &vmap_all);
 		if(is_if_is_else.first) {
-			vmap_ptr = &vmap_block;
 			//is_if_is_else.first = (contains_args(args, "{") || contains_args(args, "}")) ? false : true;
 			is_if_is_else.first = (contains_args(args, "}")) ? false : true;
 		} else if(is_if_is_else.second) {
-			vmap_ptr = &vmap_block;
+			is_elif = contains_args(args, "elif");
 			if(contains_args(args, "}")) {
 				is_if_is_else.second = false;
-				vmap_ptr = &vmap;
+				vmap_all = *vmap_arr[1];
 			}
-			args.clear();
-			continue;
+			if(!is_elif) {
+				args.clear();
+				continue; // not continuing if its else if statement because it'd skip it
+			}
+			is_str = true; // using is_str to reduce code, causing root str to say as is
+			root = "elif";  
+			erase_key(args, "}");
+			// might be shit code.. but im sleepy
 		}
 		if(!is_if_is_else.first && !is_if_is_else.second) {
 			vmap_block.clear();
-			vmap_ptr = &vmap;
+			vmap_all = *vmap_arr[1];
 		}
-		auto is_str = std::holds_alternative<std::string>(s_tree->root);
-		std::string root;
-		root = (is_str) ? std::get<std::string>(s_tree->root) : root;
+		is_str =  (is_str) ? std::holds_alternative<std::string>(s_tree->root) : is_str;
+		root = (is_str) ? root : std::get<std::string>(s_tree->root);
+		is_str = false; // setting back to default, so next line root is set properly
 		if(is_function(root)) {
 			std::string f_name = root;
 			args.erase(args.begin()); // emptying function call
@@ -240,7 +249,10 @@ void parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<
 		} else if(is_var(root)) {
 			remove_space(args, ' '); // removes the whitespaces between vars definition
 			args = calc_args(args);
-			(*vmap_ptr)[std::get<std::string>(args[1])] = (temp_args.empty()) ? args[3] : temp_args[0];
+			if(is_if_is_else.first || is_if_is_else.second)
+				vmap_block[std::get<std::string>(args[1])] = (temp_args.empty()) ? args[3] : temp_args[0];
+			else
+				vmap_global[std::get<std::string>(args[1])] = (temp_args.empty()) ? args[3] : temp_args[0];
 			// either making it to the third member (the value of var) or assigning it to the only member of vector
 		} else if(is_if_statement(root)) {
 			if(args.empty())
