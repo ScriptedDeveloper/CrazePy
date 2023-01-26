@@ -5,7 +5,7 @@
 #include <variant>
 #include "parser.h"
 	
-parser::parser(ArgVector &tokens_, std::string &fname) : file_name(), tokens(tokens_)  {
+parser::parser(ArgVector &tokens_, std::string &fname) : param_map(), file_name(), tokens(tokens_)  {
 	file_name = fname;
 }
 
@@ -33,8 +33,7 @@ ArgVector parser::calc_args(ArgVector &args) {
 		}
 		if(std::holds_alternative<std::string>(x) && is_operator(std::get<std::string>(x))) {
 			std::string op = std::get<std::string>(x);
-			int x1, x2;
-			try {
+			int x1, x2; try {
 				x1 = std::get<int>((args[i - 1])), x2 = std::get<int>(args[i + 1]);
 			} catch(const std::bad_variant_access&) {
 				return args; // no arithmatic operation involved
@@ -188,6 +187,34 @@ bool parser::tree_is_full(std::shared_ptr<AST> single_t) {
 	return false;
 }
 
+void parser::set_variable_values(ArgVector &args, std::string f_name, bool is_name) {
+	int it = 0;
+	get_function_name(f_name);
+	if(param_map.find(f_name) == param_map.end())
+		param_map[f_name] = VarMap(); // if member doesnt exist, create one
+	if(is_name) {
+		bool var_begin = false;
+		for(auto i : args) {
+			std::string i_str = std::get<std::string>(i); // i is guranteed to be of type std::string if is name
+			bool is_call = (i_str.find("()") == i_str.npos) ? false : true;
+			var_begin = (i_str == "()" || is_call || var_begin) ? true : false;
+			if(var_begin && (i_str != "()" || !is_call))
+				param_map[f_name][std::get<std::string>(i)] = {}; // creating empty member, so later in is_name = false it can be assigned
+		}
+		return;
+	}
+	for(auto i : args) {
+		int it_loop = 0;
+		for(auto &i_ : param_map[f_name]) {
+			if(it == it_loop)  {
+				i_.second = i;
+				break;
+			}
+			it_loop++;
+		}
+		it++;
+	}
+}
 
 std::vector<std::shared_ptr<AST>> parser::create_tree() {
 	std::vector<std::shared_ptr<AST>> ast_vec{};
@@ -214,19 +241,19 @@ void parser::get_function_name(std::string &func) {
 	func = func.substr(0, func.find("("));
 }
 
-void parser::save_function(std::shared_ptr<FunctionMap> FMap, std::shared_ptr<AST> s_tree, int i) {
+void parser::save_function(std::shared_ptr<FunctionMap> FMap, std::shared_ptr<AST> s_tree, int i, ArgVector &args) {
 	auto func_name = std::get<std::string>(s_tree->right_node->root);
 	get_function_name(func_name);
+	set_variable_values(args, func_name, true);
 	(*FMap)[func_name] = i + 1; // putting function name in Map, so later it can get called by that name, i++ so it knows which line the function starts
 }
 
-void parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<CPPFunctionMap> CPPMap, int i, bool single_function, VarMap vmap_global) { 
+void parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<CPPFunctionMap> CPPMap, std::shared_ptr<FunctionMap> PyFMap, int i, bool single_function, VarMap vmap_global, VarMap vmap_params) { 
 	ArgVector temp_args, args;
-	auto PyFMap = std::make_shared<FunctionMap>();
 	std::pair<bool, bool> is_if_is_else = {false, false}; // first : is_if, second : is_else
 	bool is_str = false, is_elif = false, skip = false; // this is for elif statements, not like above for else statements, skip is for skipping for example a function block
-	VarMap vmap_block, vmap_all; // vmap_block is for local variables declared in a if/else block or later functions, see get_vmap() for vmap_all usage
-	std::array<VarMap*, 2> vmap_arr = {&vmap_block, &vmap_global};
+	VarMap vmap_all, vmap_block; // vmap_block is for local variables declared in a if/else block or later functions, see get_vmap() for vmap_all usage
+	std::array<VarMap*, 3> vmap_arr = {&vmap_block, &vmap_global, &vmap_params};
 	std::map<std::string, std::shared_ptr<AST>> declared_funcs; 	
 	std::string root;
 	for(auto s_tree : tree) {
@@ -272,6 +299,7 @@ void parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<
 			do {
 				calc_args(args);
 			} while(args.size() > 1 && temp_args != args);
+			set_variable_values(args, f_name);
 			call_function(CPPMap, f_name, args, PyFMap, tree, vmap_global);
 			temp_args.clear();
 		} else if(is_var(root)) {
@@ -283,7 +311,7 @@ void parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<
 				vmap_global[std::get<std::string>(args[1])] = (temp_args.empty()) ? args[3] : temp_args[0];
 			// either making it to the third member (the value of var) or assigning it to the only member of vector
 		} else if(is_function_declaration(root)) {
-			save_function(PyFMap, s_tree, i);
+			save_function(PyFMap, s_tree, i, args);
 			skip = true; // skips next function block, not called yet
 		} else if(is_if_statement(root)) {
 			if(args.empty())
@@ -342,7 +370,8 @@ void parser::init_FMap(std::shared_ptr<CPPFunctionMap> FMap) { // have to hardco
 
 void parser::init_parser() {
 	auto CPPFMap = std::make_shared<CPPFunctionMap>();
+	auto PyFMap = std::make_shared<FunctionMap>();
 	init_FMap(CPPFMap); // adding function pointers to Map
 	std::vector<std::shared_ptr<AST>> tree = create_tree();
-	parse_tree(tree, CPPFMap);
+	parse_tree(tree, CPPFMap, PyFMap);
 }
