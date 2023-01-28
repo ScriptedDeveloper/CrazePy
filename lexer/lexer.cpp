@@ -10,15 +10,19 @@ lexer::lexer(std::string filename) : name(filename), tokens({}) {
 }
 
 void lexer::add_token(ArgVector &curr_tokens, std::string &token) {
+	std::pair<bool, bool> is_bool = {(token == "true" || token == "false") ? true : false, (token == "true") ? true : false}; // first pair says if is bool or not, second pair then tells if its true, or false
 	if(token.empty())
 		return; // invalid input
 	if(std::all_of(token.begin(), token.end(), ::isdigit)) {
 		curr_tokens.push_back(std::stoi(token));
 		token.clear();
-		return;
+	} else if(is_bool.first) {
+		curr_tokens.push_back(is_bool.second);
+		token.clear();
+	} else {
+		curr_tokens.push_back(token);
+		token.clear();
 	}
-	curr_tokens.push_back(token);
-	token.clear();
 }
 
 ArgVector lexer::get_tokens() {
