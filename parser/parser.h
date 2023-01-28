@@ -46,6 +46,7 @@ class parser {
 		VarMap get_vmap(T arr);
 		static bool has_one_value(const ArgVector &args);
 		bool compare_values(ArgVector &args);
+		static bool contains_str(const std::string &str, const std::string &key);
 		bool is_function_declaration(std::string token);
 		bool is_var(std::string token);
 		bool is_if_statement(std::string token);

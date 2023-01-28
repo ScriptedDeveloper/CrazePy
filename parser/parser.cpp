@@ -136,6 +136,10 @@ bool parser::is_operator(std::string token) {
 	return false;
 }
 
+bool parser::contains_str(const std::string &str, const std::string &key) {
+	return (str.find(key) == str.npos) ? false : true;
+}	
+
 bool parser::end_of_code_block(std::string token) {
 	return (token.find("}") == std::string::npos) ? false : true;
 }
@@ -157,7 +161,7 @@ bool parser::compare_values(ArgVector &args) {
 }
 
 bool parser::is_if_statement(std::string token) {
-	return token == "if" || token == "else" || token == "elif";
+	return contains_str(token ,"if") || contains_str(token, "else") || contains_str(token, "elif");
 }
 
 bool parser::is_function_declaration(std::string token) {
@@ -165,7 +169,7 @@ bool parser::is_function_declaration(std::string token) {
 }
 
 bool parser::is_function(std::string token) {
-	return (token.find("(") == token.npos) ? false : true;
+	return contains_str(token, "(") && !contains_str(token, "if");
 }
 
 bool parser::is_var(std::string token) {
