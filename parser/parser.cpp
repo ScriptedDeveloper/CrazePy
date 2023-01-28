@@ -63,7 +63,7 @@ ArgVector parser::calc_args(ArgVector &args) {
 	return args;
 }
 
-std::shared_ptr<AST> AST::add_node(std::variant<std::string, int, bool, double, float, char> token, std::shared_ptr<AST> node) {
+std::shared_ptr<AST> AST::add_node(AnyVar token, std::shared_ptr<AST> node) {
 	auto node_temp = node;
 	while(true) {
 		auto root_str = node_temp->root;
@@ -176,7 +176,7 @@ bool parser::is_var(std::string token) {
 	return token == "var";
 }
 
-bool parser::contains_args(ArgVector &args, std::variant<std::string, int, bool, double, float, char> keyword) {
+bool parser::contains_args(ArgVector &args, AnyVar keyword) {
 	for(auto i : args) {
 		if(i == keyword)
 			return true;
@@ -245,11 +245,44 @@ void parser::get_function_name(std::string &func) {
 	func = func.substr(0, func.find("("));
 }
 
+std::string parser::contains_function_vec(ArgVector &args) {
+	for(auto i : args) {
+		if(std::holds_alternative<std::string>(i)) {
+			std::string func_str = std::get<std::string>(i);
+			if(is_function(func_str))
+				return func_str;
+		}
+	}
+	return "";
+}
+
 void parser::save_function(std::shared_ptr<FunctionMap> FMap, std::shared_ptr<AST> s_tree, int i, ArgVector &args) {
 	auto func_name = std::get<std::string>(s_tree->right_node->root);
 	get_function_name(func_name);
 	set_variable_values(args, func_name, true);
 	(*FMap)[func_name] = i + 1; // putting function name in Map, so later it can get called by that name, i++ so it knows which line the function starts
+}
+
+void parser::call_if_contains_func(std::shared_ptr<CPPFunctionMap> CPPMap, std::shared_ptr<FunctionMap> PyFMap, 
+	ArgVector &args, std::vector<std::shared_ptr<AST>> tree, VarMap &vmap_global) {
+	std::string f_name = contains_function_vec(args);
+	if(!f_name.empty()) {
+		ArgVector args_temp;
+		bool save = false; // save all params after function call
+		for(auto i : args) {
+			if(std::holds_alternative<std::string>(i)) {
+				auto pot_func_name = std::get<std::string>(i);
+				if(pot_func_name == f_name) {
+					save = true;
+				}
+				continue;
+			}
+			if(save)
+				args_temp.push_back(i);
+		}
+		set_variable_values(args_temp, f_name);
+		call_function(CPPMap, f_name, args_temp, PyFMap, tree, vmap_global);
+	}
 }
 
 void parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<CPPFunctionMap> CPPMap, std::shared_ptr<FunctionMap> PyFMap, int i, bool single_function, VarMap vmap_global, VarMap vmap_params) { 
@@ -309,6 +342,7 @@ void parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<
 		} else if(is_var(root)) {
 			remove_space(args, ' '); // removes the whitespaces between vars definition
 			args = calc_args(args);
+			call_if_contains_func(CPPMap, PyFMap, args, tree, vmap_all);
 			if(single_function || (is_if_is_else.first || is_if_is_else.second)) // always put vars in vmap_block if its only a single function
 				vmap_block[std::get<std::string>(args[1])] = (temp_args.empty()) ? args[3] : temp_args[0];
 			else
@@ -332,7 +366,7 @@ void parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<
 	}
 }
 
-bool parser::is_variant_int(std::variant<std::string, int, bool, double, float> i) {
+bool parser::is_variant_int(AnyVar i) {
 	try {
 		std::get<int>(i);
 	} catch(std::bad_variant_access const&) {

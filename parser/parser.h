@@ -7,13 +7,14 @@
 #include <functional>
 #include "../lexer/lexer.h"
 
-using ArgVector = std::vector<std::variant<std::string, int, bool, double, float, char>>;
-using VarMap = std::unordered_map<std::string, std::variant<std::string, int, bool, double, float, char>>;
+using AnyVar = std::variant<std::string, int, bool, double, float, char>;
+using ArgVector = std::vector<AnyVar>;
+using VarMap = std::unordered_map<std::string, AnyVar>;
 
 class AST {
 	public:	
-		std::shared_ptr<AST> add_node(std::variant<std::string, int, bool, double, float, char> token, std::shared_ptr<AST> node);
-		std::variant<std::string, int, bool, double, float, char> root;
+		std::shared_ptr<AST> add_node(AnyVar token, std::shared_ptr<AST> node);
+		AnyVar root;
 		size_t nodes;
 		bool read = false; // for parsing the tree to check if it has been read or not
 		std::shared_ptr<AST> left_node{}; // like a binary tree
@@ -38,6 +39,9 @@ class parser {
 		void save_function(std::shared_ptr<FunctionMap> FMap, std::shared_ptr<AST> tree, int i, ArgVector &args); // i is for iteration till it finds the correct line
 		bool tree_is_full(std::shared_ptr<AST> single_t);
 		bool end_of_code_block(std::string token);
+		std::string contains_function_vec(ArgVector &args);
+		void call_if_contains_func(std::shared_ptr<CPPFunctionMap> CPPMap, std::shared_ptr<FunctionMap> PyFMap, 
+		ArgVector &args, std::vector<std::shared_ptr<AST>> tree, VarMap &vmap_global);
 		void set_variable_values(ArgVector &args, std::string f_name, bool is_name = false);
 		void get_function_name(std::string &func);
 		template <typename T>
@@ -45,16 +49,16 @@ class parser {
 		template<typename T>
 		VarMap get_vmap(T arr);
 		static bool has_one_value(const ArgVector &args);
-		bool compare_values(ArgVector &args);
-		static bool contains_str(const std::string &str, const std::string &key);
+		bool compare_values(ArgVector &args); static bool contains_str(const std::string &str, const std::string &key);
 		bool is_function_declaration(std::string token);
 		bool is_var(std::string token);
 		bool is_if_statement(std::string token);
 		void init_FMap(std::shared_ptr<CPPFunctionMap> FMap);
 		void print(ArgVector &args);
 		template <typename P>
-		void call_function(std::shared_ptr<CPPFunctionMap> FMap, std::string func_name, P params, std::shared_ptr<FunctionMap> PyMap, std::vector<std::shared_ptr<AST>> tree, VarMap &vmap_global);
-		bool contains_args(ArgVector &args, std::variant<std::string, int, bool, double, float, char> keyword);
+		void call_function(std::shared_ptr<CPPFunctionMap> FMap, std::string func_name, P params, 
+		std::shared_ptr<FunctionMap> PyMap, std::vector<std::shared_ptr<AST>> tree, VarMap &vmap_global);
+		bool contains_args(ArgVector &args, AnyVar keyword);
 	public:
 		template <typename T>
 		static auto replace_variable(T &var, const VarMap &vmap);
@@ -62,7 +66,7 @@ class parser {
 		static void remove_space(ArgVector &args, const T &space);
 		static bool is_operator(std::string token);
 		static bool is_function(std::string token);
-		static bool is_variant_int(std::variant<std::string, int, bool, double, float> i);
+		static bool is_variant_int(AnyVar i);
 		std::vector<std::shared_ptr<AST>> create_tree(); // pair because i wanna know the amount of nodes
 		void parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<CPPFunctionMap> FMap, std::shared_ptr<FunctionMap> PyMap, int i = 1, 
 			bool single_function = false, VarMap vmap_global = VarMap(), VarMap vmap_params = VarMap()); // line counting starts from 1, not 0
