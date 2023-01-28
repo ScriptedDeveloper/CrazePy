@@ -10,13 +10,13 @@ CrazePy is a dynamically typed programming language, which means that a variable
 - [ ] Functions
     - [x] Parameters
     - [x] callable
-    - [ ] returnable
+    - [x] returnable
 - [x] Data types
     - [x] string
     - [x] int
     - [x] double
     - [x] float
-    - [ ] bool
+    - [x] bool
 - [x] Arithmetic operations
 - [x] If statements
     - [x] else statements
