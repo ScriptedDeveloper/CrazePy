@@ -24,7 +24,8 @@ bool parser::has_one_value(const ArgVector &args) {
 }
 
 ArgVector parser::calc_args(ArgVector &args) {
-	int i = 0;
+	size_t i = 0;
+	long i_ = 0;
 	if(has_one_value(args))
 		return args; // only has one value, no need to do anything
 	for(auto x : args) {	
@@ -47,8 +48,8 @@ ArgVector parser::calc_args(ArgVector &args) {
 			} else { // ugly but it works for now
 				args[i] = x1 * x2;
 			}
-			args.erase(args.begin() + i + 1);
-			args.erase(args.begin() + i - 1);
+			args.erase(args.begin() + i_ + 1);
+			args.erase(args.begin() + i_ - 1);
 			break;
 		} else {
 			if(std::holds_alternative<std::string>(x)) {
@@ -59,6 +60,7 @@ ArgVector parser::calc_args(ArgVector &args) {
 			}
 		}
 		i++;
+		i_++;
 	}
 	return args;
 }
@@ -121,7 +123,7 @@ ArgVector AST::get_params(ArgVector &params, std::shared_ptr<AST> root_ptr, VarM
 		}
 	}	
 	parser::remove_space(params, ' '); 
-	int it = 0;
+	ArgVector::size_type it = 0;
 	if(free)
 		return params; // do nothing if we simply free the nodes
 	for(auto i : params) {
@@ -235,7 +237,7 @@ std::vector<std::shared_ptr<AST>> parser::create_tree() {
 	std::vector<std::shared_ptr<AST>> ast_vec{};
 	auto single_t = std::make_shared<AST>();
 	single_t->allocate_nodes();
-	int i = 0;
+	size_t i = 0;
 	for(auto token : tokens) {
 		single_t = (single_t == nullptr) ? std::make_shared<AST>() : single_t;
 		if(std::holds_alternative<std::string>(token) && std::get<std::string>(token) == "\b") {
