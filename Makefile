@@ -26,6 +26,9 @@ crazepy : $(OBJ)
 $(OBJ): $(SRC)
 	$(CC) -c $< $(CFLAGS) -o $@
 
+$(SRC) :
+	clang-format -style=file $@ -i
+
 clean :
 	rm -rf crazepy
 	rm -rf *.o
