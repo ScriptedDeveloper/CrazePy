@@ -3,6 +3,7 @@
 #include <any>
 #include <functional>
 #include <map>
+#include <stack>
 #include <memory>
 #include <unordered_map>
 #include <variant>
@@ -40,9 +41,10 @@ class parser {
 					   ArgVector &args); // i is for iteration till it finds the correct line
 	bool tree_is_full(std::shared_ptr<AST> single_t);
 	bool end_of_code_block(ArgVector &args, std::string root);
+	bool contains_body(ArgVector &args);
 	std::string contains_function_vec(ArgVector &args);
 	bool call_if_contains_func(std::shared_ptr<CPPFunctionMap> CPPMap, std::shared_ptr<FunctionMap> PyFMap,
-							   ArgVector &args, std::vector<std::shared_ptr<AST>> tree, VarMap &vmap_global);
+							   ArgVector &args, std::vector<std::shared_ptr<AST>> tree, VarMap &vmap_global, std::stack<std::string> &brackets);
 	void set_variable_values(ArgVector &args, std::string f_name, bool is_name = false);
 	void get_function_name(std::string &func);
 	template <typename T> void erase_key(T &args, std::string key);
