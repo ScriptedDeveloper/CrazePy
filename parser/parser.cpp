@@ -10,17 +10,12 @@ parser::parser(ArgVector &tokens_, std::string &fname) : param_map(), file_name(
 
 AST::AST() : root(), nodes() {}
 
-bool parser::has_one_value(const ArgVector &args) {
-	int i = 0;
-	auto is_int = [&](AnyVar x) {
-		if (std::holds_alternative<int>(x)) {
-			i++;
-			return true;
-		}
+bool parser::has_one_value(ArgVector args) {
+	if (args.empty())
 		return false;
-	};
-	std::find_if(args.begin(), args.end(), is_int);
-	return (i == 1) ? true : false;
+	auto is_int = [&](AnyVar x) { return std::holds_alternative<int>(x); };
+	args.erase(std::remove_if(args.begin(), args.end(), is_int));
+	return (args.size() == 1) ? true : false;
 }
 
 ArgVector parser::calc_args(ArgVector &args) {
@@ -32,32 +27,36 @@ ArgVector parser::calc_args(ArgVector &args) {
 		long i_ = 0;
 		if (has_one_value(args))
 			return args; // only has one value, no need to do anything
-		for (auto x : args) {
-			if (args.size() <= 1) {
+		auto is_op = [](AnyVar x) {
+			return (std::holds_alternative<std::string>(x) && is_operator(std::get<std::string>(x))) ? true : false;
+		};
+		for (auto it = std::find_if(args.begin(), args.end(), is_op); it != args.end();
+			 it = std::find_if(it++, args.end(), is_op)) {
+			if (args.size() <= 1)
 				break;
-			}
-			if (std::holds_alternative<std::string>(x) && is_operator(std::get<std::string>(x))) {
+			if (std::holds_alternative<std::string>(*it) && is_operator(std::get<std::string>(*it))) {
+				auto dist = std::distance(args.begin(), it);
 				no_equation = false;
-				std::string op = std::get<std::string>(x);
+				std::string op = std::get<std::string>(*it);
 				int x1, x2;
 				try {
-					x1 = std::get<int>((args[i + 1])), x2 = std::get<int>(args[i - 1]);
+					x1 = std::get<int>((args[dist + 1])), x2 = std::get<int>(args[dist - 1]);
 				} catch (const std::bad_variant_access &) {
 					return args; // no arithmatic operation involved
 				}
 				if (op == "+") {
-					args[i - 1] = x1 + x2;
+					args[dist--] = x1 + x2;
 				} else if (op == "-") {
-					args[i - 1] = x1 - x2;
+					args[dist--] = x1 - x2;
 				} else if (op == "/") {
-					args[i - 1] = x1 / x2;
+					args[dist--] = x1 / x2;
 				} else if (op == "*") { // ugly but it works for now
-					args[i - 1] = x1 * x2;
+					args[dist--] = x1 * x2;
 				} else {
 					return args; // no equation left
 				}
-				for (int it = 0; it <= 1; it++)
-					args.erase(args.begin() + i_);
+				for (int it1 = 0; it1 <= 1; it1++)
+					args.erase(args.begin() + dist + it1);
 				if (args == temp_args)
 					return args; // nothing has changed, return!
 				break;

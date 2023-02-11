@@ -53,7 +53,7 @@ class parser {
 	void erase_iterator_skip(std::vector<std::stack<char>::size_type> &loop_it, std::stack<char> &brackets);
 	template <typename T> void erase_key(T &args, std::string key);
 	template <typename T> VarMap get_vmap(T arr);
-	static bool has_one_value(const ArgVector &args);
+	static bool has_one_value(ArgVector args);
 	bool compare_values(ArgVector &args);
 	static bool contains_str(const std::string &str, const std::string &key);
 	bool is_function_declaration(std::string token);
