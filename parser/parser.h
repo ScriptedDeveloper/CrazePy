@@ -3,6 +3,7 @@
 #include <any>
 #include <functional>
 #include <map>
+#include <stack>
 #include <memory>
 #include <unordered_map>
 #include <variant>
@@ -39,12 +40,17 @@ class parser {
 	void save_function(std::shared_ptr<FunctionMap> FMap, std::shared_ptr<AST> tree, int i,
 					   ArgVector &args); // i is for iteration till it finds the correct line
 	bool tree_is_full(std::shared_ptr<AST> single_t);
-	bool end_of_code_block(ArgVector &args, std::string root);
+	bool end_of_code_block(std::string root);
+	bool contains_body(ArgVector &args);
+	bool check_statement(ArgVector &args, std::stack<char> &brackets, std::pair<bool ,bool> &is_if_is_else);
+	bool contains_while(std::string token);
 	std::string contains_function_vec(ArgVector &args);
 	bool call_if_contains_func(std::shared_ptr<CPPFunctionMap> CPPMap, std::shared_ptr<FunctionMap> PyFMap,
-							   ArgVector &args, std::vector<std::shared_ptr<AST>> tree, VarMap &vmap_global);
+							   ArgVector &args, std::vector<std::shared_ptr<AST>> tree, VarMap &vmap_global, std::stack<char> brackets);
 	void set_variable_values(ArgVector &args, std::string f_name, bool is_name = false);
 	void get_function_name(std::string &func);
+	void save_iterator_skip(std::vector<std::stack<char>::size_type> &loop_it, std::stack<char> &brackets);
+	void erase_iterator_skip(std::vector<std::stack<char>::size_type> &loop_it, std::stack<char> &brackets);
 	template <typename T> void erase_key(T &args, std::string key);
 	template <typename T> VarMap get_vmap(T arr);
 	static bool has_one_value(const ArgVector &args);
@@ -59,12 +65,12 @@ class parser {
 	AnyVar call_function(std::shared_ptr<CPPFunctionMap> FMap, std::string func_name, P params,
 						 std::shared_ptr<FunctionMap> PyMap, std::vector<std::shared_ptr<AST>> tree,
 						 VarMap &vmap_global);
-	bool contains_args(ArgVector &args, AnyVar keyword);
 
   public:
 	template <typename T> static auto replace_variable(T &var, const VarMap &vmap);
 	template <typename T> static void remove_space(ArgVector &args, const T &space);
-	static bool is_operator(std::string token);
+	static int contains_args(ArgVector &args, AnyVar keyword, bool duplicated = false);
+	static bool is_operator(std::string token, bool equal = false);
 	static bool is_function(std::string token);
 	static bool is_variant_int(AnyVar i);
 	std::vector<std::shared_ptr<AST>> create_tree(); // pair because i wanna know the amount of nodes

@@ -12,6 +12,7 @@ CFLAGS		+= -Wextra
 CFLAGS		+= -Wshadow 
 CFLAGS		+= -Wpedantic 
 CFLAGS		+= -Wconversion
+CFLAGS		+= -lboost_filesystem
 CFLAGS		+= -Weffc++
 CFLAGS		+= -std=c++17
 #CFLAGS		+= -O3 For production only
@@ -29,3 +30,4 @@ crazepy : $(OBJ)
 clean :
 	rm -rf crazepy
 	rm -rf *.o
+
