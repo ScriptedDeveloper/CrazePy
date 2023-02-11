@@ -1,5 +1,4 @@
 #include "parser.h"
-#include <exception>
 #include <functional>
 #include <iostream>
 #include <memory>
@@ -165,11 +164,7 @@ bool parser::contains_str(const std::string &str, const std::string &key) {
 	return (str.find(key) == str.npos) ? false : true;
 }
 
-bool parser::end_of_code_block(ArgVector &args, std::string root) {
-	if (args.size() == 1)
-		return (root.find("}") == std::string::npos) ? false : true;
-	return false;
-}
+bool parser::end_of_code_block(std::string root) { return (root.find("}") == std::string::npos) ? false : true; }
 
 bool parser::compare_values(ArgVector &args) {
 	if (args.size() <= 2) {
@@ -221,6 +216,10 @@ void parser::get_function_name(std::string &func) {
 
 bool parser::is_var(std::string token) {
 	return token == "var";
+}
+
+bool parser::contains_while(std::string token) {
+	return (token.find("while") == token.npos) ? false : true;
 }
 
 // clang-format on
@@ -318,6 +317,20 @@ void parser::save_function(std::shared_ptr<FunctionMap> FMap, std::shared_ptr<AS
 								// knows which line the function starts
 }
 
+bool parser::check_statement(ArgVector &args, std::stack<char> &brackets, std::pair<bool, bool> &is_if_is_else) {
+	if (args.empty())
+		exit(1); // exitting, invalid if statement.
+	calc_args(args);
+	brackets.push('{');
+	if (!compare_values(args) && !is_if_is_else.second) {
+		is_if_is_else = {false, true}; // setting else_if true, because if statement is false
+		return false;
+	} else {
+		is_if_is_else = {true, false}; // opposite here
+		return true;
+	}
+}
+
 bool parser::call_if_contains_func(std::shared_ptr<CPPFunctionMap> CPPMap, std::shared_ptr<FunctionMap> PyFMap,
 								   ArgVector &args, std::vector<std::shared_ptr<AST>> tree, VarMap &vmap_global,
 								   std::stack<char> brackets) {
@@ -344,6 +357,17 @@ bool parser::call_if_contains_func(std::shared_ptr<CPPFunctionMap> CPPMap, std::
 	return true;
 }
 
+void parser::save_iterator_skip(std::vector<std::stack<char>::size_type> &loop_it, std::stack<char> &brackets) {
+	brackets.push('{');
+	loop_it.push_back(brackets.size());
+}
+
+void parser::erase_iterator_skip(std::vector<std::stack<char>::size_type> &loop_it, std::stack<char> &brackets) {
+	loop_it.erase(loop_it.begin());
+	if (!brackets.empty())
+		brackets.pop();
+}
+
 AnyVar parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_ptr<CPPFunctionMap> CPPMap,
 						  std::shared_ptr<FunctionMap> PyFMap, int i, bool single_function, VarMap vmap_global,
 						  VarMap vmap_params) {
@@ -355,51 +379,83 @@ AnyVar parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_pt
 								 // see get_vmap() for vmap_all usage
 	std::stack<char> brackets;	 // using stack to keep track of nested loops/statements
 	std::array<VarMap *, 3> vmap_arr = {&vmap_block, &vmap_global, &vmap_params};
-	vmap_global = vmap_params; // params are globals
+	std::vector<std::stack<char>::size_type> is_while,
+		loop_it; // stores the index number of brackets in stack, loop_it is for everything else
+	std::vector<std::vector<AnyVar>::size_type> while_iteration; // saves beginning of while loop
+	vmap_global = vmap_params;									 // params are globals
 	std::map<std::string, std::shared_ptr<AST>> declared_funcs;
+	bool skipped_block = false; // checks whether the code block was skipped
 	std::string root;
 	if (single_function)
 		brackets.push('{'); // the function body itself is a body
-	for (auto s_tree : tree) {
+	for (std::vector<AnyVar>::size_type it = 0; it <= tree.size() - 1; it++) {
+		auto s_tree = tree[it];
 		vmap_all = get_vmap(vmap_arr);
 		args.clear();
 		args = s_tree->get_params(args, s_tree, &vmap_all);
-		if (contains_args(args, "}") != -1 && brackets.size() > 0)
+		bool contains_brackets = (contains_args(args, "}") != -1) ? true : false;
+		if (contains_brackets && brackets.size() > 0 && !skip && !is_while.empty()) {
+			if (is_while.size() != 0 && contains_args(args, "}") != -1) {
+				if (is_while[0] == brackets.size()) {
+					it = while_iteration[0] - 1;
+					continue;
+				}
+			}
 			brackets.pop();
+			contains_brackets = false;
+		}
 		if (i > 1 && single_function) {
 			i--;
 			continue; // jumping to line i, so it goes to function for example
 		} else if (skip) {
-			if (contains_body(args))
+			if (contains_body(args) || contains_args(args, "while()") != -1 || contains_args(args, "if()") != -1)
 				brackets.push('{'); // also keeping track in function
-			skip = (end_of_code_block(args, std::get<std::string>(s_tree->root)) && brackets.size() == 0)
+			else if (contains_args(args, "}") != -1)
+				brackets.pop(); // either add new body, or remove
+			skip = (end_of_code_block(std::get<std::string>(s_tree->root)) &&
+					(brackets.size() == 0 || (!is_while.empty() && is_while[0] == brackets.size()) ||
+					 (!loop_it.empty() && loop_it[0] == brackets.size())))
 					   ? false
 					   : true; // once end of function block arrives, dont skip anymore
+			if (single_function && brackets.size() == 1)
+				skip = false;
+			if (!skip) {
+				auto brackets_temp = brackets;
+				if (!is_while.empty()) {
+					erase_iterator_skip(is_while, brackets_temp);
+				} else if (!loop_it.empty())
+					erase_iterator_skip(loop_it, brackets_temp);
+				skipped_block = true;
+			}
 			continue;
 		}
-		if (single_function && end_of_code_block(args, std::get<std::string>(s_tree->root)) && brackets.size() == 0)
-			break; // only execute that function and return
 
+		if (single_function && end_of_code_block(std::get<std::string>(s_tree->root)) && brackets.size() == 1 &&
+			args.size() == 1)
+			break; // only execute that function and return
+		if (contains_brackets)
+			brackets.pop();
 		if (is_if_is_else.first) {
 			if (contains_args(args, "else") != -1) {
-				brackets.push('{');
+				save_iterator_skip(loop_it, brackets);
 				skip = true;
 			}
-			is_if_is_else.first = (brackets.size() == 0) ? false : true;
+			is_if_is_else.first = (brackets.size() == 0 || brackets.size() == loop_it[0]) ? false : true;
 		} else if (is_if_is_else.second) {
 			is_elif = (contains_args(args, "elif") != -1 || contains_args(args, "elif()") != -1) ? true : false;
-			if (contains_args(args, "}")) {
-				is_if_is_else.second = false;
-				vmap_all = *vmap_arr[1];
+			if (!skip && !skipped_block) {
+				save_iterator_skip(loop_it, brackets);
+				skip = true;
+				continue;
 			}
-			if (!is_elif) {
-				args.clear();
-				continue; // not continuing if its else if statement because it'd skip it
+			is_if_is_else.second = false;
+			skipped_block = false;
+			vmap_all = *vmap_arr[1];
+			if (is_elif) {
+				is_str = true; // using is_str to reduce code, causing root str to say as is
+				root = "elif";
+				erase_key(args, "}");
 			}
-			is_str = true; // using is_str to reduce code, causing root str to say as is
-			root = "elif";
-			erase_key(args, "}");
-			// might be shit code.. but im sleepy
 		}
 		if (!is_if_is_else.first && !is_if_is_else.second) {
 			vmap_block.clear();
@@ -408,12 +464,33 @@ AnyVar parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_pt
 		is_str = (is_str) ? std::holds_alternative<std::string>(s_tree->root) : is_str;
 		root = (is_str) ? root : std::get<std::string>(s_tree->root);
 		is_str = false; // setting back to default, so next line root is set properly
-		if (is_function(root)) {
+		if (contains_while(root)) {
+			std::stack<char> brackets_temp;
+			std::pair<bool, bool> temp_is_if;
+			bool is_true = check_statement(args, brackets_temp, temp_is_if);
+			if (!is_true && is_while.size() != 0) { // while loop is false, break!
+				is_while.erase(is_while.begin()); // erasing this specific is_while because the while function has ended
+				while_iteration.erase(while_iteration.begin());
+				brackets.pop();
+				save_iterator_skip(is_while, brackets);
+				skip = true;
+			} else if (is_true) { // while loop is true and is on beginning
+				auto it_find = std::find(is_while.begin(), is_while.end(), brackets.size());
+				if (it_find == is_while.end()) {
+					is_while.push_back(brackets.size());
+					while_iteration.push_back(it);
+					brackets.push('{');
+				}
+			} else if (!is_true) {
+				save_iterator_skip(is_while, brackets); // skipping this code block, expression is not true
+				skip = true;
+			}
+			continue;
+		} else if (is_function(root)) {
 			std::string f_name = root;
 			args.erase(args.begin()); // emptying function call
 			temp_args = args;
 			calc_args(args);
-			brackets.push('{');
 			set_variable_values(args, f_name);
 			call_function(CPPMap, f_name, args, PyFMap, tree, vmap_global);
 			temp_args.clear();
@@ -429,20 +506,13 @@ AnyVar parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_pt
 			// either making it to the third member (the value of var) or assigning it to the only member of vector
 		} else if (is_function_declaration(root)) {
 			save_function(PyFMap, s_tree, i, args);
-			brackets.push('{');
+			save_iterator_skip(loop_it, brackets);
 			skip = true; // skips next function block, not called yet
 		} else if (contains_args(args, "return") != -1) {
 			return args[1]; // returning object
 		} else if (is_if_statement(root)) {
-			if (args.empty())
-				exit(1); // exitting, invalid if statement.
-			calc_args(args);
-			brackets.push('{');
-			if (!compare_values(args) && !is_if_is_else.second) {
-				is_if_is_else = {false, true}; // setting else_if true, because if statement is false
-			} else {
-				is_if_is_else = {true, false}; // opposite here
-			}
+			check_statement(args, brackets, is_if_is_else);
+			loop_it.push_back(brackets.size());
 		} else if (contains_args(args, "=") != -1 && contains_args(args, "var") == -1) { // redefining variable
 			calc_args(args);
 			auto key = std::get<std::string>(args[0]);
