@@ -149,13 +149,12 @@ ArgVector AST::get_params(ArgVector &params, std::shared_ptr<AST> root_ptr, VarM
 	return params;
 }
 
-bool parser::is_operator(std::string token, bool equal) { // bool equal is if it should check for equal sign too
-	const std::vector<std::string> ops = {"/", "+", "-", "*",
-										  "="}; // treating char as string because token is string too
-	for (std::string op : ops) {
-		if ((token == ops.back() && equal) || (token != ops[ops.size() - 1] && op == token)) {
+bool parser::is_operator(std::string token, bool equal) {		// bool equal is if it should check for equal sign too
+	std::array<std::string, 5> ops = {"/", "+", "-", "*", "="}; // treating char as string because token is string too
+	auto it = std::find(ops.begin(), ops.end(), token);
+	if (it != ops.end()) {
+		if ((*it == ops.back() && equal) || (token != ops.back() && *it == token))
 			return true;
-		}
 	}
 	return false;
 }
