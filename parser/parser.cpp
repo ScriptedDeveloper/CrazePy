@@ -12,13 +12,15 @@ AST::AST() : root(), nodes() {}
 
 bool parser::has_one_value(const ArgVector &args) {
 	int i = 0;
-	for (auto x : args) {
-		if (std::holds_alternative<int>(x))
+	auto is_int = [&](AnyVar x) {
+		if (std::holds_alternative<int>(x)) {
 			i++;
-		if (i == 2)
-			return false;
-	}
-	return true;
+			return true;
+		}
+		return false;
+	};
+	std::find_if(args.begin(), args.end(), is_int);
+	return (i == 1) ? true : false;
 }
 
 ArgVector parser::calc_args(ArgVector &args) {
