@@ -338,17 +338,13 @@ bool parser::call_if_contains_func(std::shared_ptr<CPPFunctionMap> CPPMap, std::
 	if (f_name.empty())
 		return false; // no function name there
 	ArgVector args_temp;
-	bool save = false; // save all params after function call
-	for (auto i : args) {
-		if (std::holds_alternative<std::string>(i)) {
-			auto pot_func_name = std::get<std::string>(i);
-			if (pot_func_name == f_name) {
-				save = true;
-			}
-			continue;
-		}
-		if (save)
-			args_temp.push_back(i);
+	auto is_func = [f_name](AnyVar i) {
+		return (std::holds_alternative<std::string>(i) && std::get<std::string>(i) == f_name) ? true : false;
+	};
+	auto result = std::find_if(args.begin(), args.end(), is_func);
+	if (result != args.end()) {
+		for (auto it = result; it != args.end(); it++)
+			args_temp.push_back(*it);
 	}
 	set_variable_values(args_temp, f_name);
 	brackets.push('{');
@@ -385,6 +381,7 @@ AnyVar parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_pt
 	vmap_global = vmap_params;									 // params are globals
 	std::map<std::string, std::shared_ptr<AST>> declared_funcs;
 	bool skipped_block = false; // checks whether the code block was skipped
+	bool removed_bracket = false;
 	std::string root;
 	if (single_function)
 		brackets.push('{'); // the function body itself is a body
@@ -410,8 +407,10 @@ AnyVar parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_pt
 		} else if (skip) {
 			if (contains_body(args) || contains_args(args, "while()") != -1 || contains_args(args, "if()") != -1)
 				brackets.push('{'); // also keeping track in function
-			else if (contains_args(args, "}") != -1)
+			if (contains_args(args, "}") != -1) {
 				brackets.pop(); // either add new body, or remove
+				removed_bracket = true;
+			}
 			skip = (end_of_code_block(std::get<std::string>(s_tree->root)) &&
 					(brackets.size() == 0 || (!is_while.empty() && is_while[0] == brackets.size()) ||
 					 (!loop_it.empty() && loop_it[0] == brackets.size())))
@@ -426,25 +425,28 @@ AnyVar parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_pt
 				} else if (!loop_it.empty())
 					erase_iterator_skip(loop_it, brackets_temp);
 				skipped_block = true;
-			}
-			continue;
+			} else
+				continue;
 		}
 
 		if (single_function && end_of_code_block(std::get<std::string>(s_tree->root)) && brackets.size() == 1 &&
 			args.size() == 1)
 			break; // only execute that function and return
-		if (contains_brackets)
+		if (contains_brackets && !removed_bracket)
 			brackets.pop();
+		removed_bracket = false;
 		if (is_if_is_else.first) {
+			std::stack<char> brackets_temp;
 			if (contains_args(args, "else") != -1) {
-				save_iterator_skip(loop_it, brackets);
+				save_iterator_skip(loop_it, brackets_temp);
 				skip = true;
 			}
 			is_if_is_else.first = (brackets.size() == 0 || brackets.size() == loop_it[0]) ? false : true;
 		} else if (is_if_is_else.second) {
+			std::stack<char> brackets_temp;
 			is_elif = (contains_args(args, "elif") != -1 || contains_args(args, "elif()") != -1) ? true : false;
 			if (!skip && !skipped_block) {
-				save_iterator_skip(loop_it, brackets);
+				save_iterator_skip(loop_it, brackets_temp);
 				skip = true;
 				continue;
 			}
@@ -497,11 +499,8 @@ AnyVar parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_pt
 		} else if (is_var(root)) {
 			remove_space(args, ' '); // removes the whitespaces between vars definition
 			args = calc_args(args);
-			bool is_func = call_if_contains_func(CPPMap, PyFMap, args, tree, vmap_global, brackets);
-			if ((single_function || (is_if_is_else.first || is_if_is_else.second)) &&
-				!is_func) // always put vars in vmap_block if its only a single function
-				vmap_block[std::get<std::string>(args[1])] = args[args.size() - 1];
-			else if (!is_func) // if is function inside variable, the vmap member already got replaced
+			bool contains_func = call_if_contains_func(CPPMap, PyFMap, args, tree, vmap_global, brackets);
+			if (!contains_func)
 				vmap_global[std::get<std::string>(args[1])] = args[args.size() - 1];
 			// either making it to the third member (the value of var) or assigning it to the only member of vector
 		} else if (is_function_declaration(root)) {
