@@ -393,12 +393,13 @@ AnyVar parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_pt
 		bool contains_brackets = (contains_args(args, "}") != -1) ? true : false;
 		if (contains_brackets && brackets.size() > 0 && !skip && !is_while.empty()) {
 			if (is_while.size() != 0 && contains_args(args, "}") != -1) {
+				brackets.pop();
 				if (is_while[0] == brackets.size()) {
 					it = while_iteration[0] - 1;
+					is_while.erase(is_while.begin());
 					continue;
 				}
 			}
-			brackets.pop();
 			contains_brackets = false;
 		}
 		if (i > 1 && single_function) {
