@@ -28,13 +28,14 @@ ArgVector parser::calc_args(ArgVector &args) {
 		if (has_one_value(args))
 			return args; // only has one value, no need to do anything
 		auto is_op = [](AnyVar x) {
-			return (std::holds_alternative<std::string>(x) && is_operator(std::get<std::string>(x))) ? true : false;
+			return (std::holds_alternative<std::string>(x) && is_operator(std::get<std::string>(x)).first) ? true
+																										   : false;
 		};
 		for (auto it = std::find_if(args.begin(), args.end(), is_op); it != args.end();
 			 it = std::find_if(it++, args.end(), is_op)) {
 			if (args.size() <= 1)
 				break;
-			if (std::holds_alternative<std::string>(*it) && is_operator(std::get<std::string>(*it))) {
+			if (std::holds_alternative<std::string>(*it) && is_operator(std::get<std::string>(*it)).first) {
 				auto dist = std::distance(args.begin(), it);
 				no_equation = false;
 				std::string op = std::get<std::string>(*it);
@@ -150,14 +151,23 @@ ArgVector AST::get_params(ArgVector &params, std::shared_ptr<AST> root_ptr, VarM
 	return params;
 }
 
-bool parser::is_operator(std::string token, bool equal) {		// bool equal is if it should check for equal sign too
+std::pair<bool, bool> parser::is_operator(std::string token,
+										  bool equal) {			// bool equal is if it should check for equal sign too
 	std::array<std::string, 5> ops = {"/", "+", "-", "*", "="}; // treating char as string because token is string too
 	auto it = std::find(ops.begin(), ops.end(), token);
+	auto is_exclamation_mark = [&](char c) {
+		return (c == '!' && it-- != ops.end() && *it-- == std::to_string(c)) ? true : false;
+	};
 	if (it != ops.end()) {
-		if ((*it == ops.back() && equal) || (token != ops.back() && *it == token))
-			return true;
+		if ((*it == ops.back() && equal) || (token != ops.back() && *it == token)) {
+			if (std::find_if(token.begin(), token.end(), is_exclamation_mark) == token.end()) {
+				return {true, false};
+			} else {
+				return {false, true};
+			}
+		}
 	}
-	return false;
+	return {false, false};
 }
 
 bool parser::contains_str(const std::string &str, const std::string &key) {
