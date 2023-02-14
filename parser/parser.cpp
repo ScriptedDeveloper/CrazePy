@@ -162,9 +162,8 @@ std::pair<bool, bool> parser::is_operator(std::string token,
 		if ((*it == ops.back() && equal) || (token != ops.back() && *it == token)) {
 			if (std::find_if(token.begin(), token.end(), is_exclamation_mark) == token.end()) {
 				return {true, false};
-			} else {
-				return {false, true};
 			}
+			return {false, true};
 		}
 	}
 	return {false, false};
