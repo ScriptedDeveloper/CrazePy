@@ -70,7 +70,7 @@ class parser {
 	template <typename T> static auto replace_variable(T &var, const VarMap &vmap);
 	template <typename T> static void remove_space(ArgVector &args, const T &space);
 	static int contains_args(ArgVector &args, AnyVar keyword, bool duplicated = false);
-	static bool is_operator(std::string token, bool equal = false);
+	static std::pair<bool, bool> is_operator(std::string token, bool equal = false);
 	static bool is_function(std::string token);
 	static bool is_variant_int(AnyVar i);
 	std::vector<std::shared_ptr<AST>> create_tree(); // pair because i wanna know the amount of nodes
