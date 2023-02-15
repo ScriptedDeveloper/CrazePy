@@ -23,7 +23,7 @@ CrazePy is a dynamically typed programming language, which means that a variable
     - [x] Elif statements
 - [ ] Standard Library
     - [x] Print function
-    - [ ] Input function
+    - [x] Input function
     - [ ] ...
 - [ ] For/While Loops
     - [x] while loops

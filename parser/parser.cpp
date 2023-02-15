@@ -1,4 +1,5 @@
 #include "parser.h"
+#include <cmath>
 #include <functional>
 #include <iostream>
 #include <memory>
@@ -109,7 +110,6 @@ ArgVector AST::get_params(ArgVector &params, std::shared_ptr<AST> root_ptr, VarM
 	}
 	while (params.size() < root_ptr->nodes) {
 		try {
-
 			if (!temp_ptr->read && !free) {
 				params.push_back(temp_ptr->root);
 				temp_ptr->read = true;
@@ -162,9 +162,8 @@ std::pair<bool, bool> parser::is_operator(std::string token,
 		if ((*it == ops.back() && equal) || (token != ops.back() && *it == token)) {
 			if (std::find_if(token.begin(), token.end(), is_exclamation_mark) == token.end()) {
 				return {true, false};
-			} else {
-				return {false, true};
 			}
+			return {false, true};
 		}
 	}
 	return {false, false};
@@ -578,7 +577,39 @@ void parser::init_FMap(std::shared_ptr<CPPFunctionMap> FMap) { // have to hardco
 				i); // btw, this is what happens if you write code under pressure during New year celebrations LOL
 		}
 	};
+	(*FMap)["input"] =
+		(std::function<void(ArgVector & args, AnyVar & return_val)>)[](ArgVector & args, AnyVar & return_val) {
+		std::string input;
+		std::cin >> input;
+		auto val1 = is_type<int>(input);
+		auto val2 = is_type<bool>(input);
+		auto val3 = is_type<double>(input);
+		auto val4 = is_type<float>(input); // sorry, im trying to do this quickly
+		if (val1.first)
+			return_val = val1.second;
+		else if (val2.first)
+			return_val = val2.second;
+		else if (val3.first)
+			return_val = val3.second;
+		else if (val4.first)
+			return_val = val4.second;
+		else
+			return_val = input;
+		args.clear(); // very unnecessary, getting rid of compiler unused warning
+	};
 }
+/*
+void input(ArgVector &args, AnyVar &return_val) {
+	std::visit(
+		[&](auto &arg) {
+			AnyVar new_var;
+			std::cin << new_var;
+			std::cout <<  << std::endl;
+		},
+		return_val);
+	args.clear();
+}
+*/
 
 void parser::init_parser() {
 	auto CPPFMap = std::make_shared<CPPFunctionMap>();
