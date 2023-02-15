@@ -7,11 +7,8 @@
 #include <memory>
 #include <unordered_map>
 #include <variant>
-
-using AnyVar = std::variant<std::string, int, bool, double, float, char>;
-using ArgVector = std::vector<AnyVar>;
-using VarMap = std::unordered_map<std::string, AnyVar>;
-
+#include <sstream>
+#include "../type_names.h"
 class AST {
   public:
 	std::shared_ptr<AST> add_node(AnyVar token, std::shared_ptr<AST> node);
@@ -41,6 +38,8 @@ class parser {
 					   ArgVector &args); // i is for iteration till it finds the correct line
 	bool tree_is_full(std::shared_ptr<AST> single_t);
 	bool end_of_code_block(std::string root);
+	template <typename T>
+	static auto is_type(const std::string &str);
 	bool contains_body(ArgVector &args);
 	bool check_statement(ArgVector &args, std::stack<char> &brackets, std::pair<bool ,bool> &is_if_is_else);
 	bool contains_while(std::string token);
@@ -83,6 +82,7 @@ class parser {
 	parser(ArgVector &tokens_, std::string &fname);
 };
 
+void input(ArgVector &args, AnyVar &return_val);
 // have to implement some kind of data structure to save function return values or parameters to access them l8ter.. but
 // this is good for now
 template <typename P>
@@ -91,17 +91,23 @@ AnyVar parser::call_function(std::shared_ptr<CPPFunctionMap> CPPFMap, std::strin
 							 VarMap &vmap_global) {
 	auto CPPmap = *CPPFMap;
 	auto FMap = *PyMap;
+	AnyVar return_val = 0; // havent found a better way of doing this
 	get_function_name(func_name);
 	if (CPPmap.find(func_name) != CPPmap.end()) {
-		std::any &any = CPPmap[func_name];
-		auto function = std::any_cast<std::function<void(P & params)>>(any);
-		std::invoke(function, params); // std::invoke will be important for later
+		auto &any = CPPmap[func_name];
+		try {
+			auto function = std::any_cast<std::function<void(P & params, AnyVar &return_val)>>(any);
+			std::invoke(function, params, return_val); // std::invoke will be important for later
+		} catch(std::bad_any_cast&) {
+			auto function = std::any_cast<std::function<void(P & params)>>(any); // retrying without return val
+			std::invoke(function, params); 
+		}
 	} else if (FMap.find(func_name) != FMap.end()) {
 		if (PyMap->find(func_name) == PyMap->end())
 			return 1; // function name not found, proper error handeling later
 		return parse_tree(tree, CPPFMap, PyMap, (*PyMap)[func_name], true, vmap_global, param_map[func_name]);
 	}
-	return 0;
+	return return_val;
 }
 
 template <typename T> void parser::remove_space(ArgVector &args, const T &space) {
@@ -141,6 +147,15 @@ template <typename T> void parser::erase_key(T &args, std::string key) {
 		}
 		it++;
 	}
+}
+
+template <typename T>
+auto parser::is_type(const std::string &str) {
+	auto result = T();
+	auto istream = std::istringstream(str);
+	istream >> result;
+	std::pair<bool, double> pair1 = {true, result}, pair2 = {false, 0};
+	return (istream.eof() && !istream.fail()) ? pair1 : pair2;
 }
 
 /*

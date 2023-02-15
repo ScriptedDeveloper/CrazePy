@@ -2,8 +2,8 @@
 #include <iostream>
 #include <variant>
 #include <vector>
-
-using ArgVector = std::vector<std::variant<std::string, int, bool, double, float, char>>;
+#include "../type_names.h"
+using ArgVector = std::vector<AnyVar>;
 
 class lexer {
   private:
