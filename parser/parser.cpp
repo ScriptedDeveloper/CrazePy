@@ -598,18 +598,6 @@ void parser::init_FMap(std::shared_ptr<CPPFunctionMap> FMap) { // have to hardco
 		args.clear(); // very unnecessary, getting rid of compiler unused warning
 	};
 }
-/*
-void input(ArgVector &args, AnyVar &return_val) {
-	std::visit(
-		[&](auto &arg) {
-			AnyVar new_var;
-			std::cin << new_var;
-			std::cout <<  << std::endl;
-		},
-		return_val);
-	args.clear();
-}
-*/
 
 void parser::init_parser() {
 	auto CPPFMap = std::make_shared<CPPFunctionMap>();
