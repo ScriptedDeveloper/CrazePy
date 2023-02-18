@@ -34,10 +34,15 @@ ArgVector lexer::get_tokens() {
 		if (line.find(";") != line.npos && line.find("{") != line.npos && line.find("}") != line.npos &&
 			line.find("\0") != line.npos && line.find(" ") != line.npos)
 			exit(1); // right now just simply exit, will do error handeling properly l8ter
-		bool is_string = false;
+		bool is_string = false, is_not_equal_to = false;
 		for (char c : line) {
 			std::string pot_operator = std::string(1, c);
 			auto is_op = parser::is_operator(pot_operator, true);
+			if (is_not_equal_to) {
+				token.push_back(c);
+				add_token(curr_tokens, token);
+				continue;
+			}
 			if ((std::isalpha(c) || std::isdigit(c) || c == '(' || c == '\\') && !is_string) {
 				if (c == '(') {
 					token.append(pot_operator + ")"); // using variable that is not designed for this purpose
@@ -54,23 +59,18 @@ ArgVector lexer::get_tokens() {
 					continue;
 				token.append("\\s"); // marking var as string
 			} else if (is_string || c == '!') {
+				if (c == '!') {
+					add_token(curr_tokens, token);
+					is_not_equal_to = true;
+				}
 				token.push_back(c);
 				continue;
 			} else if (c == '#')
 				break; // current line is a comment
-			else if (is_op.first || c == ' ') {
+			else if (is_op || c == ' ') {
 				add_token(curr_tokens, token);
 				curr_tokens.push_back(pot_operator);
 				continue;
-			} else if (is_op.second) {
-				add_token(curr_tokens, token);
-				auto last_elm = &curr_tokens[curr_tokens.size() - 1];
-				auto last_str = std::get<std::string>(*last_elm);
-				token.push_back(last_str.back());
-				last_str.erase(last_str.size() - 1);
-				*last_elm = last_str;
-				token.append(pot_operator);
-				add_token(curr_tokens, token);
 			} else if (c == '}') {
 				token.push_back(c); // adding code new code block indication
 			}

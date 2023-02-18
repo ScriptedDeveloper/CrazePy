@@ -29,14 +29,13 @@ ArgVector parser::calc_args(ArgVector &args, int line) {
 		if (has_one_value(args))
 			return args; // only has one value, no need to do anything
 		auto is_op = [](AnyVar x) {
-			return (std::holds_alternative<std::string>(x) && is_operator(std::get<std::string>(x)).first) ? true
-																										   : false;
+			return (std::holds_alternative<std::string>(x) && is_operator(std::get<std::string>(x))) ? true : false;
 		};
 		for (auto it = std::find_if(args.begin(), args.end(), is_op); it != args.end();
 			 it = std::find_if(it++, args.end(), is_op)) {
 			if (args.size() <= 1)
 				break;
-			if (std::holds_alternative<std::string>(*it) && is_operator(std::get<std::string>(*it)).first) {
+			if (std::holds_alternative<std::string>(*it) && is_operator(std::get<std::string>(*it))) {
 				auto dist = std::distance(args.begin(), it);
 				bool failed = false;
 				no_equation = false;
@@ -161,22 +160,16 @@ ArgVector AST::get_params(ArgVector &params, std::shared_ptr<AST> root_ptr, VarM
 	return params;
 }
 
-std::pair<bool, bool> parser::is_operator(std::string token,
-										  bool equal) {			// bool equal is if it should check for equal sign too
+bool parser::is_operator(std::string token,
+						 bool equal) {							// bool equal is if it should check for equal sign too
 	std::array<std::string, 5> ops = {"/", "+", "-", "*", "="}; // treating char as string because token is string too
 	auto it = std::find(ops.begin(), ops.end(), token);
-	auto is_exclamation_mark = [&](char c) {
-		return (c == '!' && it-- != ops.end() && *it-- == std::to_string(c)) ? true : false;
-	};
 	if (it != ops.end()) {
 		if ((*it == ops.back() && equal) || (token != ops.back() && *it == token)) {
-			if (std::find_if(token.begin(), token.end(), is_exclamation_mark) == token.end()) {
-				return {true, false};
-			}
-			return {false, true};
+			return true;
 		}
 	}
-	return {false, false};
+	return false;
 }
 
 bool parser::contains_str(const std::string &str, const std::string &key) {
@@ -189,16 +182,18 @@ bool parser::compare_values(ArgVector &args) {
 	if (args.size() <= 2) {
 		return false; // wrong if statement
 	}
-	args.erase(args.begin());
-	args.erase(args.begin() + 1, args.begin() + 3); // removing first 2 if and ==
-	auto val = args[0];
-	int it = 0;
-	for (auto i : args) {
-		if (i == val && it > 0)
+	auto is_appropriate =
+		[](AnyVar i) { // this lambda checks if the value is appropriate (double, int, string...) something to check
+			if (std::holds_alternative<int>(i) || std::holds_alternative<double>(i) || std::holds_alternative<float>(i))
+				return false;
+			else if (std::holds_alternative<std::string>(i)) {
+				auto str = std::get<std::string>(i);
+				return (str.find("\"") == str.npos) ? true : false;
+			}
 			return true;
-		it++;
-	}
-	return false;
+		};
+	args.erase(std::remove_if(args.begin(), args.end(), is_appropriate));
+	return (args[0] == args[1]) ? true : false;
 }
 
 // clang-format off
@@ -243,19 +238,6 @@ bool parser::contains_while(std::string token) {
 
 // clang-format on
 // if i wouldn't do this, clang-format would make these functions a one-liner, which make it even more unreadable
-
-int parser::contains_args(ArgVector &args, AnyVar keyword,
-						  bool duplicated) { // duplicated checks for duplicated members
-	int it = 0;
-	bool duplicated_found = false;
-	for (auto i : args) {
-		if ((i == keyword && !duplicated) || (i == keyword && duplicated_found && duplicated))
-			return it;
-		duplicated_found = (duplicated && i == keyword) ? true : false;
-		it++;
-	}
-	return -1;
-}
 
 bool parser::tree_is_full(std::shared_ptr<AST> single_t) {
 	if (single_t != nullptr && single_t->left_node != nullptr && single_t->right_node != nullptr) {
@@ -336,18 +318,27 @@ void parser::save_function(std::shared_ptr<FunctionMap> FMap, std::shared_ptr<AS
 								// knows which line the function starts
 }
 
+bool parser::is_not_equal_statement(ArgVector &args) { return (contains_args(args, "!=") != -1) ? true : false; }
+
 bool parser::check_statement(ArgVector &args, std::stack<char> &brackets, std::pair<bool, bool> &is_if_is_else,
 							 int line) {
 	if (args.empty())
 		exit(1); // exitting, invalid if statement.
 	calc_args(args, line);
 	brackets.push('{');
+	bool is_not_equal = is_not_equal_statement(args);
 	if (!compare_values(args) && !is_if_is_else.second) {
-		is_if_is_else = {false, true}; // setting else_if true, because if statement is false
-		return false;
+		if (is_not_equal)
+			is_if_is_else = {true, false}; // swapped because we are checking for the opposite
+		else
+			is_if_is_else = {false, true}; // setting else_if true, because if statement is false
+		return is_not_equal;
 	} else {
-		is_if_is_else = {true, false}; // opposite here
-		return true;
+		if (is_not_equal)
+			is_if_is_else = {false, true};
+		else
+			is_if_is_else = {true, false};
+		return is_not_equal;
 	}
 }
 
@@ -546,7 +537,7 @@ AnyVar parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_pt
 				vmap_block[key] = args.back();
 			else if (vmap_global.count(key))
 				vmap_global[key] = args.back();
-		} 
+		}
 		i = (single_function)
 				? i
 				: i + 1; // not incrementing if its single_function because it's already decrementing (line 230)

@@ -40,6 +40,7 @@ class parser {
 					   ArgVector &args); // i is for iteration till it finds the correct line
 	bool tree_is_full(std::shared_ptr<AST> single_t);
 	bool end_of_code_block(std::string root);
+	bool is_not_equal_statement(ArgVector &args);
 	template <typename T>
 	static auto is_type(const std::string &str);
 	bool contains_body(ArgVector &args);
@@ -70,8 +71,9 @@ class parser {
   public:
 	template <typename T> static auto replace_variable(T &var, const VarMap &vmap);
 	template <typename T> static void remove_space(ArgVector &args, const T &space);
-	static int contains_args(ArgVector &args, AnyVar keyword, bool duplicated = false);
-	static std::pair<bool, bool> is_operator(std::string token, bool equal = false);
+	template <typename T>
+	static int contains_args(T &args, AnyVar keyword, bool duplicated = false);
+	static bool is_operator(std::string token, bool equal = false);
 	static bool is_function(std::string token);
 	static bool is_variant_int(AnyVar i);
 	std::vector<std::shared_ptr<AST>> create_tree(); // pair because i wanna know the amount of nodes
@@ -160,24 +162,17 @@ auto parser::is_type(const std::string &str) {
 	std::pair<bool, double> pair1 = {true, result}, pair2 = {false, 0};
 	return (istream.eof() && !istream.fail()) ? pair1 : pair2;
 }
-
-/*
 template <typename T>
-auto AST::add_data(ArgVector &params, T data) {
-	if(std::holds_alternative<std::string>(data)) {
-		auto str = std::get<std::string>(data);
-		auto i = str.find("\\s");
-		if(i != str.npos) {
-			str.erase(i, 2);
-			params.push_back(str); // adding str to params
-		} else {
-			if(parser::is_function(str) || parser::is_operator(str)) {
-				params.push_back(str);
-			}
-			 // continuing l8ter, for keywords
-		}
-	} else {
-		params.push_back(data);
+int parser::contains_args(T &args, AnyVar keyword, // T being here either std::array<AnyVar> or ArgVector
+						  bool duplicated) { // duplicated checks for duplicated members
+	int it = 0;
+	bool duplicated_found = false;
+	for (auto i : args) {
+		if ((i == keyword && !duplicated) || (i == keyword && duplicated_found && duplicated))
+			return it;
+		duplicated_found = (duplicated && i == keyword) ? true : false;
+		it++;
 	}
+	return -1;
 }
-*/
+
