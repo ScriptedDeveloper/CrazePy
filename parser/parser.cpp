@@ -5,9 +5,9 @@
 #include <memory>
 #include <variant>
 
-parser::parser(ArgVector &tokens_, std::string &fname) : param_map(), file_name(), tokens(tokens_) {
-	file_name = fname;
-}
+std::string file_name;
+
+parser::parser(ArgVector &tokens_, std::string &fname) : param_map(), tokens(tokens_) { file_name = fname; }
 
 AST::AST() : root(), nodes() {}
 
@@ -19,7 +19,7 @@ bool parser::has_one_value(ArgVector args) {
 	return (args.size() == 1) ? true : false;
 }
 
-ArgVector parser::calc_args(ArgVector &args) {
+ArgVector parser::calc_args(ArgVector &args, int line) {
 	ArgVector temp_args;
 	while (true) {
 		temp_args = args;
@@ -38,21 +38,31 @@ ArgVector parser::calc_args(ArgVector &args) {
 				break;
 			if (std::holds_alternative<std::string>(*it) && is_operator(std::get<std::string>(*it)).first) {
 				auto dist = std::distance(args.begin(), it);
+				bool failed = false;
 				no_equation = false;
 				std::string op = std::get<std::string>(*it);
 				int x1, x2;
 				try {
 					x1 = std::get<int>((args[dist + 1])), x2 = std::get<int>(args[dist - 1]);
 				} catch (const std::bad_variant_access &) {
-					return args; // no arithmatic operation involved
+					failed = true;
+					// no arithmatic operation involved
 				}
 				if (op == "+") {
+					if (failed)
+						exception::raise(exception::addition_err, line);
 					args[dist--] = x1 + x2;
 				} else if (op == "-") {
+					if (failed)
+						exception::raise(exception::subtraction_err, line);
 					args[dist--] = x1 - x2;
 				} else if (op == "/") {
+					if (failed)
+						exception::raise(exception::division_err, line);
 					args[dist--] = x1 / x2;
 				} else if (op == "*") { // ugly but it works for now
+					if (failed)
+						exception::raise(exception::multiplication_err, line);
 					args[dist--] = x1 * x2;
 				} else {
 					return args; // no equation left
@@ -326,10 +336,11 @@ void parser::save_function(std::shared_ptr<FunctionMap> FMap, std::shared_ptr<AS
 								// knows which line the function starts
 }
 
-bool parser::check_statement(ArgVector &args, std::stack<char> &brackets, std::pair<bool, bool> &is_if_is_else) {
+bool parser::check_statement(ArgVector &args, std::stack<char> &brackets, std::pair<bool, bool> &is_if_is_else,
+							 int line) {
 	if (args.empty())
 		exit(1); // exitting, invalid if statement.
-	calc_args(args);
+	calc_args(args, line);
 	brackets.push('{');
 	if (!compare_values(args) && !is_if_is_else.second) {
 		is_if_is_else = {false, true}; // setting else_if true, because if statement is false
@@ -342,7 +353,7 @@ bool parser::check_statement(ArgVector &args, std::stack<char> &brackets, std::p
 
 bool parser::call_if_contains_func(std::shared_ptr<CPPFunctionMap> CPPMap, std::shared_ptr<FunctionMap> PyFMap,
 								   ArgVector &args, std::vector<std::shared_ptr<AST>> tree, VarMap &vmap_global,
-								   std::stack<char> brackets) {
+								   std::stack<char> brackets, int line) {
 	std::string f_name = contains_function_vec(args);
 	if (f_name.empty())
 		return false; // no function name there
@@ -357,8 +368,8 @@ bool parser::call_if_contains_func(std::shared_ptr<CPPFunctionMap> CPPMap, std::
 	}
 	set_variable_values(args_temp, f_name);
 	brackets.push('{');
-	vmap_global[std::get<std::string>(args[1])] = call_function(
-		CPPMap, f_name, args_temp, PyFMap, tree, vmap_global); // setting function variable to return value
+	vmap_global[std::get<std::string>(args[1])] = call_function(CPPMap, f_name, args_temp, PyFMap, tree, vmap_global,
+																line); // setting function variable to return value
 	return true;
 }
 
@@ -390,7 +401,7 @@ AnyVar parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_pt
 	vmap_global = vmap_params;									 // params are globals
 	std::map<std::string, std::shared_ptr<AST>> declared_funcs;
 	bool skipped_block = false; // checks whether the code block was skipped
-	bool removed_bracket = false;
+	bool removed_bracket = false, removed_bracket_loop = false;
 	std::string root;
 	if (single_function)
 		brackets.push('{'); // the function body itself is a body
@@ -405,6 +416,7 @@ AnyVar parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_pt
 				brackets.pop();
 				if (is_while[0] == brackets.size()) {
 					it = while_iteration[0] - 1;
+					removed_bracket_loop = true;
 					is_while.erase(is_while.begin());
 					continue;
 				}
@@ -435,6 +447,8 @@ AnyVar parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_pt
 				} else if (!loop_it.empty())
 					erase_iterator_skip(loop_it, brackets_temp);
 				skipped_block = true;
+				if (brackets.size() == 1)
+					continue; // if not continuing, next if statement would catch it and exit function
 			} else
 				continue;
 		}
@@ -479,11 +493,13 @@ AnyVar parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_pt
 		if (contains_while(root)) {
 			std::stack<char> brackets_temp;
 			std::pair<bool, bool> temp_is_if;
-			bool is_true = check_statement(args, brackets_temp, temp_is_if);
+			bool is_true = check_statement(args, brackets_temp, temp_is_if, i);
 			if (!is_true && is_while.size() != 0) { // while loop is false, break!
 				is_while.erase(is_while.begin()); // erasing this specific is_while because the while function has ended
 				while_iteration.erase(while_iteration.begin());
-				brackets.pop();
+				if (!removed_bracket_loop)
+					brackets.pop();
+				removed_bracket_loop = false;
 				save_iterator_skip(is_while, brackets);
 				skip = true;
 			} else if (is_true) { // while loop is true and is on beginning
@@ -502,34 +518,35 @@ AnyVar parser::parse_tree(std::vector<std::shared_ptr<AST>> tree, std::shared_pt
 			std::string f_name = root;
 			args.erase(args.begin()); // emptying function call
 			temp_args = args;
-			calc_args(args);
+			calc_args(args, i);
 			set_variable_values(args, f_name);
-			call_function(CPPMap, f_name, args, PyFMap, tree, vmap_global);
+			call_function(CPPMap, f_name, args, PyFMap, tree, vmap_global, i);
 			temp_args.clear();
 		} else if (is_var(root)) {
 			remove_space(args, ' '); // removes the whitespaces between vars definition
-			args = calc_args(args);
-			bool contains_func = call_if_contains_func(CPPMap, PyFMap, args, tree, vmap_global, brackets);
+			args = calc_args(args, i);
+			bool contains_func = call_if_contains_func(CPPMap, PyFMap, args, tree, vmap_global, brackets, i);
 			if (!contains_func)
 				vmap_global[std::get<std::string>(args[1])] = args[args.size() - 1];
 			// either making it to the third member (the value of var) or assigning it to the only member of vector
 		} else if (is_function_declaration(root)) {
+			std::vector<std::stack<char>::size_type> loop_it_temp;
 			save_function(PyFMap, s_tree, i, args);
-			save_iterator_skip(loop_it, brackets);
+			save_iterator_skip(loop_it_temp, brackets);
 			skip = true; // skips next function block, not called yet
 		} else if (contains_args(args, "return") != -1) {
 			return args[1]; // returning object
 		} else if (is_if_statement(root)) {
-			check_statement(args, brackets, is_if_is_else);
+			check_statement(args, brackets, is_if_is_else, i);
 			loop_it.push_back(brackets.size());
 		} else if (contains_args(args, "=") != -1 && contains_args(args, "var") == -1) { // redefining variable
-			calc_args(args);
+			calc_args(args, i);
 			auto key = std::get<std::string>(args[0]);
 			if (vmap_block.count(key))
 				vmap_block[key] = args.back();
 			else if (vmap_global.count(key))
 				vmap_global[key] = args.back();
-		}
+		} 
 		i = (single_function)
 				? i
 				: i + 1; // not incrementing if its single_function because it's already decrementing (line 230)
