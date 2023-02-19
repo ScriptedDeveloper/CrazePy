@@ -4,6 +4,7 @@ override CC	:= g++
 
 all : crazepy
 
+
 CFLAGS		+= -g
 CFLAGS		+= -Wall 
 CFLAGS 		+= -Werror
@@ -12,9 +13,14 @@ CFLAGS		+= -Wextra
 CFLAGS		+= -Wshadow 
 CFLAGS		+= -Wpedantic 
 CFLAGS		+= -Wconversion
-CFLAGS		+= -lboost_filesystem
 CFLAGS		+= -Weffc++
 CFLAGS		+= -std=c++17
+CFLAGS		+= -Wdeprecated
+CFLAGS		+= -lboost_filesystem
+CFLAGS		+= -Wuninitialized
+CFLAGS		+= -Wunused
+CFLAGS		+= -fsanitize=address
+CFLAGS		+= -fsanitize=undefined
 #CFLAGS		+= -O3 For production only
 
 SRC		:= $(shell find ./* -type f -name '*.cpp')

@@ -9,6 +9,7 @@
 #include <variant>
 #include <sstream>
 #include "../type_names.h"
+#include "../error_handeling/error_handeling.h"
 class AST {
   public:
 	std::shared_ptr<AST> add_node(AnyVar token, std::shared_ptr<AST> node);
@@ -25,27 +26,29 @@ class AST {
 	template <typename T> auto add_data(ArgVector &params, T data);
 };
 
+extern std::string file_name;
+
 class parser {
   private:
 	using CPPFunctionMap = std::map<std::string, std::any>; // FMap is for pre-defined C++ functions, FunctionMap is for
 															// CrazePy defined functions
 	using FunctionMap = std::map<std::string, int>;			// int is for line number
 	std::map<std::string, VarMap> param_map;
-	std::string file_name;
 	ArgVector tokens;
 	ArgVector replace_vars(ArgVector &args);
 	void save_function(std::shared_ptr<FunctionMap> FMap, std::shared_ptr<AST> tree, int i,
 					   ArgVector &args); // i is for iteration till it finds the correct line
 	bool tree_is_full(std::shared_ptr<AST> single_t);
 	bool end_of_code_block(std::string root);
+	bool is_not_equal_statement(ArgVector &args);
 	template <typename T>
 	static auto is_type(const std::string &str);
 	bool contains_body(ArgVector &args);
-	bool check_statement(ArgVector &args, std::stack<char> &brackets, std::pair<bool ,bool> &is_if_is_else);
+	bool check_statement(ArgVector &args, std::stack<char> &brackets, std::pair<bool ,bool> &is_if_is_else, int line);
 	bool contains_while(std::string token);
 	std::string contains_function_vec(ArgVector &args);
 	bool call_if_contains_func(std::shared_ptr<CPPFunctionMap> CPPMap, std::shared_ptr<FunctionMap> PyFMap,
-							   ArgVector &args, std::vector<std::shared_ptr<AST>> tree, VarMap &vmap_global, std::stack<char> brackets);
+							   ArgVector &args, std::vector<std::shared_ptr<AST>> tree, VarMap &vmap_global, std::stack<char> brackets, int line);
 	void set_variable_values(ArgVector &args, std::string f_name, bool is_name = false);
 	void get_function_name(std::string &func);
 	void save_iterator_skip(std::vector<std::stack<char>::size_type> &loop_it, std::stack<char> &brackets);
@@ -63,13 +66,14 @@ class parser {
 	template <typename P>
 	AnyVar call_function(std::shared_ptr<CPPFunctionMap> FMap, std::string func_name, P params,
 						 std::shared_ptr<FunctionMap> PyMap, std::vector<std::shared_ptr<AST>> tree,
-						 VarMap &vmap_global);
+						 VarMap &vmap_global, int line);
 
   public:
 	template <typename T> static auto replace_variable(T &var, const VarMap &vmap);
 	template <typename T> static void remove_space(ArgVector &args, const T &space);
-	static int contains_args(ArgVector &args, AnyVar keyword, bool duplicated = false);
-	static std::pair<bool, bool> is_operator(std::string token, bool equal = false);
+	template <typename T>
+	static int contains_args(T &args, AnyVar keyword, bool duplicated = false);
+	static bool is_operator(std::string token, bool equal = false);
 	static bool is_function(std::string token);
 	static bool is_variant_int(AnyVar i);
 	std::vector<std::shared_ptr<AST>> create_tree(); // pair because i wanna know the amount of nodes
@@ -78,7 +82,7 @@ class parser {
 					  VarMap vmap_global = VarMap(),
 					  VarMap vmap_params = VarMap()); // line counting starts from 1, not 0
 	void init_parser();
-	static ArgVector calc_args(ArgVector &args); // for expressions like 1+1 or Hello + World
+	static ArgVector calc_args(ArgVector &args, int line); // for expressions like 1+1 or Hello + World
 	parser(ArgVector &tokens_, std::string &fname);
 };
 
@@ -88,7 +92,7 @@ void input(ArgVector &args, AnyVar &return_val);
 template <typename P>
 AnyVar parser::call_function(std::shared_ptr<CPPFunctionMap> CPPFMap, std::string func_name, P params,
 							 std::shared_ptr<FunctionMap> PyMap, std::vector<std::shared_ptr<AST>> tree,
-							 VarMap &vmap_global) {
+							 VarMap &vmap_global, int line) {
 	auto CPPmap = *CPPFMap;
 	auto FMap = *PyMap;
 	AnyVar return_val = 0; // havent found a better way of doing this
@@ -106,7 +110,8 @@ AnyVar parser::call_function(std::shared_ptr<CPPFunctionMap> CPPFMap, std::strin
 		if (PyMap->find(func_name) == PyMap->end())
 			return 1; // function name not found, proper error handeling later
 		return parse_tree(tree, CPPFMap, PyMap, (*PyMap)[func_name], true, vmap_global, param_map[func_name]);
-	}
+	} else 
+		exception::raise(exception::function_not_found, line);
 	return return_val;
 }
 
@@ -157,24 +162,17 @@ auto parser::is_type(const std::string &str) {
 	std::pair<bool, double> pair1 = {true, result}, pair2 = {false, 0};
 	return (istream.eof() && !istream.fail()) ? pair1 : pair2;
 }
-
-/*
 template <typename T>
-auto AST::add_data(ArgVector &params, T data) {
-	if(std::holds_alternative<std::string>(data)) {
-		auto str = std::get<std::string>(data);
-		auto i = str.find("\\s");
-		if(i != str.npos) {
-			str.erase(i, 2);
-			params.push_back(str); // adding str to params
-		} else {
-			if(parser::is_function(str) || parser::is_operator(str)) {
-				params.push_back(str);
-			}
-			 // continuing l8ter, for keywords
-		}
-	} else {
-		params.push_back(data);
+int parser::contains_args(T &args, AnyVar keyword, // T being here either std::array<AnyVar> or ArgVector
+						  bool duplicated) { // duplicated checks for duplicated members
+	int it = 0;
+	bool duplicated_found = false;
+	for (auto i : args) {
+		if ((i == keyword && !duplicated) || (i == keyword && duplicated_found && duplicated))
+			return it;
+		duplicated_found = (duplicated && i == keyword) ? true : false;
+		it++;
 	}
+	return -1;
 }
-*/
+

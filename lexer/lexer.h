@@ -3,7 +3,6 @@
 #include <variant>
 #include <vector>
 #include "../type_names.h"
-using ArgVector = std::vector<AnyVar>;
 
 class lexer {
   private:
