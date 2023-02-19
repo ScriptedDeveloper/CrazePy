@@ -36,11 +36,14 @@ ArgVector parser::calc_args(ArgVector &args, int line) {
 			if (args.size() <= 1)
 				break;
 			if (std::holds_alternative<std::string>(*it) && is_operator(std::get<std::string>(*it))) {
-				auto dist = std::distance(args.begin(), it);
+				size_t dist = 0;
+				for (auto it1 = args.begin(); it1 != it; it1++)
+					dist++; // not using std::distance because it returns long, which has different signess to size_t
+
 				bool failed = false;
 				no_equation = false;
 				std::string op = std::get<std::string>(*it);
-				int x1, x2;
+				int x1 = 0, x2 = 0;
 				try {
 					x1 = std::get<int>((args[dist + 1])), x2 = std::get<int>(args[dist - 1]);
 				} catch (const std::bad_variant_access &) {
@@ -66,8 +69,8 @@ ArgVector parser::calc_args(ArgVector &args, int line) {
 				} else {
 					return args; // no equation left
 				}
-				for (int it1 = 0; it1 <= 1; it1++)
-					args.erase(args.begin() + dist + it1);
+				for (size_t it1 = 0; it1 <= 1; it1++)
+					args.erase(args.begin() + static_cast<long>(dist) + static_cast<long>(it1));
 				if (args == temp_args)
 					return args; // nothing has changed, return!
 				break;
@@ -334,9 +337,10 @@ bool parser::check_statement(ArgVector &args, std::stack<char> &brackets, std::p
 			is_if_is_else = {false, true}; // setting else_if true, because if statement is false
 		return is_not_equal;
 	} else {
-		if (is_not_equal)
+		if (is_not_equal) {
 			is_if_is_else = {false, true};
-		else
+			return false;
+		} else
 			is_if_is_else = {true, false};
 		return is_not_equal;
 	}

@@ -28,6 +28,9 @@ void raise(int code, int line) {
 	case function_not_found:
 		std::cout << "Function not found!" << std::endl;
 		break;
+	case undefined_error:
+		std::cout << "Undefined behaviour!" << std::endl;
+		break;
 	default:
 		break;
 	}
