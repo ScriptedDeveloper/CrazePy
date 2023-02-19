@@ -59,7 +59,7 @@ ArgVector lexer::get_tokens() {
 					continue;
 				token.append("\\s"); // marking var as string
 			} else if (is_string || c == '!') {
-				if (c == '!') {
+				if (c == '!' && !is_string) {
 					add_token(curr_tokens, token);
 					is_not_equal_to = true;
 				}

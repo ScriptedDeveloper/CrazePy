@@ -69,7 +69,7 @@ class parser {
 						 VarMap &vmap_global, int line);
 
   public:
-	template <typename T> static auto replace_variable(T &var, const VarMap &vmap);
+	static auto replace_variable(AnyVar &var, const VarMap &vmap);
 	template <typename T> static void remove_space(ArgVector &args, const T &space);
 	template <typename T>
 	static int contains_args(T &args, AnyVar keyword, bool duplicated = false);
@@ -126,15 +126,6 @@ template <typename T> void parser::remove_space(ArgVector &args, const T &space)
 			   args.end());
 }
 
-template <typename T> auto parser::replace_variable(T &var, const VarMap &vmap) {
-	for (auto x : vmap) {
-		if (x.first == std::get<std::string>(var)) {
-			var = x.second; // replacing var with value
-			break;
-		}
-	}
-	return var;
-}
 
 template <typename T> VarMap parser::get_vmap(T arr) {
 	VarMap vmap_all; // putting local as well as global variables into a single map
