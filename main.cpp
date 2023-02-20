@@ -1,12 +1,18 @@
 #include "lexer/lexer.h"
 #include "parser/parser.h"
+#include <boost/filesystem.hpp>
 #include <iostream>
 
 int main(int argc, char **argv) {
 	if (argc < 2) {
 		std::cout << "Need source file!" << std::endl << "Usage : " << argv[0] << " <files>";
-		exit(0);
+		std::exit(1);
 	}
+	if (!boost::filesystem::exists(argv[1])) {
+		std::cout << "Error! File '" << argv[1] << "' doesn't exist!" << std::endl;
+		std::exit(1);
+	}
+
 	lexer l(argv[1]);
 	auto test = l.get_tokens();
 	parser p(l.tokens, l.name);
