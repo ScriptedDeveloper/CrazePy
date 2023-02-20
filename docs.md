@@ -25,3 +25,35 @@ if(myVar == false) {
 }
 ```
 As you see, the if statement works basically like any other languages does. 
+
+# elif statements
+```
+var` myVar = false;
+if(myVar == true) {
+    print("myVar is true;\n");
+} elif(myVar == false) {
+    print("myVar is false\n");
+}
+```
+Elif statements are a combination of C and Python syntax, just as promised!
+
+# While loops
+While loops work just as C loops do. 
+
+```
+var myVar = 0;
+while(myVar != 5) {
+    myVar = myVar + 1;
+}
+print(myVar);
+```
+
+# Input function
+Input function works by taking an input and saving it in a variable
+```
+var myInput = input();
+print(myInput);
+```
+**Warning ! Depending on what kind of data type you have (for example string), you need a newline in order for it to be outputted in zsh terminals.**
+
+
