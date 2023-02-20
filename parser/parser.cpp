@@ -1,6 +1,7 @@
 #include "parser.h"
 #include <cmath>
 #include <functional>
+#include <initializer_list>
 #include <iostream>
 #include <memory>
 #include <variant>
@@ -594,7 +595,8 @@ bool parser::is_variant_int(AnyVar i) {
 }
 
 void parser::init_FMap(std::shared_ptr<CPPFunctionMap> FMap) { // have to hardcode the functions, this is gonna be ugly
-	(*FMap)["print"] = (std::function<void(ArgVector & args)>)[](ArgVector & args) {
+	(*FMap)["print"] =
+		(std::function<void(ArgVector & args, AnyVar & return_val)>)[](ArgVector & args, AnyVar & return_val) {
 		for (auto i : args) {
 			std::string str{};
 			bool newline{};
@@ -604,20 +606,28 @@ void parser::init_FMap(std::shared_ptr<CPPFunctionMap> FMap) { // have to hardco
 			} catch (const std::bad_variant_access &) {
 			}
 			std::visit(
-				[=](auto &arg) {
+				[&](auto &arg) {
 					if (str.empty()) {
-						std::cout << arg;
+						std::cout << arg << std::endl;
 						if (is_variant_int(arg)) {
 							std::cout << std::endl; // printing newline for numbers, otherwise zsh wont output them
 						}
 					} else {
 						if (newline) {
-							for (size_t i_ = 0; i_ < str.length() - 2; i_++) {
-								std::cout << str[i_];
+							std::string str_convert;
+							AnyVar converted = arg;
+							if (std::holds_alternative<std::string>(converted))
+								str_convert = std::get<std::string>(converted);
+							else {
+								return_val = 1;
+								return;
 							}
-							std::cout << std::endl;
+							for (auto it = str_convert.find("\\n"); it != str_convert.npos;
+								 it = str_convert.find("\\n"))
+								str_convert.replace(it, 2, "\n");
+							std::cout << str_convert << std::endl;
 						} else {
-							std::cout << arg;
+							std::cout << arg << std::endl; // double newline
 						}
 					}
 				},

@@ -41,6 +41,8 @@ class parser {
 	bool tree_is_full(std::shared_ptr<AST> single_t);
 	bool end_of_code_block(std::string root);
 	bool is_not_equal_statement(ArgVector &args);
+	template <typename T,  typename T1>
+	bool uni_type_check(const T1 target);
 	template <typename T>
 	static auto is_type(const std::string &str);
 	bool contains_body(ArgVector &args);
@@ -152,6 +154,12 @@ auto parser::is_type(const std::string &str) {
 	istream >> result;
 	std::pair<bool, double> pair1 = {true, result}, pair2 = {false, 0};
 	return (istream.eof() && !istream.fail()) ? pair1 : pair2;
+}
+
+template <typename T,  typename T1>
+bool parser::uni_type_check(const T1 target) {
+	target = nullptr; // bypassing unused compiler warning
+	return std::is_same<T, T1>();
 }
 template <typename T>
 int parser::contains_args(T &args, AnyVar keyword, // T being here either std::array<AnyVar> or ArgVector
