@@ -32,5 +32,5 @@ CrazePy is a dynamically typed programming language, which means that a variable
 ## How to ?
 [Click here for Documentation.](docs.md)
 
-#Contributing
+## Contributing
 You want to contribute to CrazePy? Great! We use LLVM code style and thanks to clang-format, you don't have to format the code all by yourself. Just take something from the checklist (or add a feature that you'd like to add) and start working on it! For questions, you can always contact me or use GitHub issues.
