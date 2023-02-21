@@ -1,6 +1,7 @@
 #include "parser.h"
 #include <cmath>
 #include <functional>
+#include <initializer_list>
 #include <iostream>
 #include <memory>
 #include <variant>
@@ -17,6 +18,19 @@ bool parser::has_one_value(ArgVector args) {
 	auto is_int = [&](AnyVar x) { return std::holds_alternative<int>(x); };
 	args.erase(std::remove_if(args.begin(), args.end(), is_int));
 	return (args.size() == 1) ? true : false;
+}
+
+auto parser::replace_variable(AnyVar &var, const VarMap &vmap) {
+	for (auto x : vmap) {
+		if (x.first == std::get<std::string>(var)) {
+			auto var_replace = x.second; // replacing var with value
+			if (std::holds_alternative<std::string>(var_replace))
+				var_replace = std::get<std::string>(x.second) + "\\s"; // marking it as string
+			var = std::move(var_replace);
+			break;
+		}
+	}
+	return var;
 }
 
 ArgVector parser::calc_args(ArgVector &args, int line) {
@@ -47,7 +61,13 @@ ArgVector parser::calc_args(ArgVector &args, int line) {
 				try {
 					x1 = std::get<int>((args[dist + 1])), x2 = std::get<int>(args[dist - 1]);
 				} catch (const std::bad_variant_access &) {
-					failed = true;
+					try {
+						x1 = static_cast<int>(std::round(std::get<double>((args[dist + 1])))),
+						x2 = static_cast<int>(std::round(std::get<double>(args[dist - 1]))); // trying double
+						// I know you shouldnt round the double up, this is a quick solution for now
+					} catch (const std::bad_variant_access &) {
+						failed = true;
+					}
 					// no arithmatic operation involved
 				}
 				if (op == "+") {
@@ -150,8 +170,8 @@ ArgVector AST::get_params(ArgVector &params, std::shared_ptr<AST> root_ptr, VarM
 		if (std::holds_alternative<std::string>(i)) {
 			int pos_arg = parser::contains_args(params, "=");
 			int pos_arg_equal = parser::contains_args(params, "=", true);
-			if (pos_arg != i_it + 1 ||
-				pos_arg_equal != -1) { // if for example : i = 3 + 2, i dont want that i gets replaced
+			if ((pos_arg != i_it + 1 ||
+				 pos_arg_equal != -1)) { // if for example : i = 3 + 2, i dont want that i gets replaced
 				params[it] = parser::replace_variable(i, *vmap);
 			}
 		}
@@ -191,11 +211,27 @@ bool parser::compare_values(ArgVector &args) {
 				return false;
 			else if (std::holds_alternative<std::string>(i)) {
 				auto str = std::get<std::string>(i);
-				return (str.find("\"") == str.npos) ? true : false;
+				if (str.find("\\s") != str.npos)
+					return false;
 			}
 			return true;
 		};
-	args.erase(std::remove_if(args.begin(), args.end(), is_appropriate));
+	while (args.size() > 2)
+		args.erase(std::remove_if(args.begin(), args.end(), is_appropriate));
+	ArgVector temp_args = args;
+	auto has_string = [](AnyVar &i) {
+		if (std::holds_alternative<std::string>(i)) {
+			std::string str = std::get<std::string>(i);
+			auto it = str.find("\\s");
+			if (it != str.npos) {
+				str.erase(it, str.length());
+				return true;
+			}
+		}
+		return false;
+	};
+	if (std::find_if(temp_args.begin(), temp_args.end(), has_string) != temp_args.end())
+		return (temp_args[0] == temp_args[1]) ? true : false;
 	return (args[0] == args[1]) ? true : false;
 }
 
@@ -342,7 +378,7 @@ bool parser::check_statement(ArgVector &args, std::stack<char> &brackets, std::p
 			return false;
 		} else
 			is_if_is_else = {true, false};
-		return is_not_equal;
+		return true;
 	}
 }
 
@@ -559,7 +595,8 @@ bool parser::is_variant_int(AnyVar i) {
 }
 
 void parser::init_FMap(std::shared_ptr<CPPFunctionMap> FMap) { // have to hardcode the functions, this is gonna be ugly
-	(*FMap)["print"] = (std::function<void(ArgVector & args)>)[](ArgVector & args) {
+	(*FMap)["print"] =
+		(std::function<void(ArgVector & args, AnyVar & return_val)>)[](ArgVector & args, AnyVar & return_val) {
 		for (auto i : args) {
 			std::string str{};
 			bool newline{};
@@ -569,20 +606,28 @@ void parser::init_FMap(std::shared_ptr<CPPFunctionMap> FMap) { // have to hardco
 			} catch (const std::bad_variant_access &) {
 			}
 			std::visit(
-				[=](auto &arg) {
+				[&](auto &arg) {
 					if (str.empty()) {
-						std::cout << arg;
+						std::cout << arg << std::endl;
 						if (is_variant_int(arg)) {
 							std::cout << std::endl; // printing newline for numbers, otherwise zsh wont output them
 						}
 					} else {
 						if (newline) {
-							for (size_t i_ = 0; i_ < str.length() - 2; i_++) {
-								std::cout << str[i_];
+							std::string str_convert;
+							AnyVar converted = arg;
+							if (std::holds_alternative<std::string>(converted))
+								str_convert = std::get<std::string>(converted);
+							else {
+								return_val = 1;
+								return;
 							}
-							std::cout << std::endl;
+							for (auto it = str_convert.find("\\n"); it != str_convert.npos;
+								 it = str_convert.find("\\n"))
+								str_convert.replace(it, 2, "\n");
+							std::cout << str_convert << std::endl;
 						} else {
-							std::cout << arg;
+							std::cout << arg << std::endl; // double newline
 						}
 					}
 				},
