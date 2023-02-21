@@ -399,8 +399,10 @@ bool parser::call_if_contains_func(std::shared_ptr<CPPFunctionMap> CPPMap, std::
 	}
 	set_variable_values(args_temp, f_name);
 	brackets.push('{');
+	// clang-format off
 	vmap_global[std::get<std::string>(args[1])] = call_function(CPPMap, f_name, args_temp, PyFMap, tree, vmap_global,
-																line); // setting function variable to return value
+		   line); // setting function variable to return value
+	// clang-format on
 	return true;
 }
 
