@@ -10,8 +10,9 @@ lexer::lexer(std::string filename) : name(filename), tokens({}) {}
 void lexer::add_token(ArgVector &curr_tokens, std::string &token) {
 	std::pair<bool, bool> is_bool = {
 		(token == "true" || token == "false") ? true : false,
-		(token == "true") ? true
-						  : false}; // first pair says if is bool or not, second pair then tells if its true, or false
+		// clang-format off
+	(token == "true") ? true : false}; // first pair says if is bool or not, second pair then tells if its true, or false
+	// clang-format on
 	if (token.empty())
 		return; // invalid input
 	if (std::all_of(token.begin(), token.end(), ::isdigit)) {
@@ -76,12 +77,11 @@ ArgVector lexer::get_tokens() {
 			}
 			add_token(curr_tokens, token);
 		}
-		(token.empty())
-			? void()
-			: add_token(curr_tokens,
-						token); // adding last token to vector, wasn't added. probably because of empty comment
-		curr_tokens.push_back(
-			"\b"); // letting parser know that statement has ended, using backslash because script can contain \n
+		if (!token.empty())
+			add_token(curr_tokens,
+					  token); // adding last token to vector, wasn't added. probably because of empty comment
+		curr_tokens.push_back("\b");
+		// letting parser know that statement has ended, using backslash because script can contain \n
 	}
 	if (!token.empty()) {
 		auto is_str = std::holds_alternative<std::string>(tokens[tokens.size() - 1]);

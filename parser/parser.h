@@ -116,17 +116,18 @@ AnyVar parser::call_function(std::shared_ptr<CPPFunctionMap> CPPFMap, std::strin
 		exception::raise(exception::function_not_found, line);
 	return return_val;
 }
-
+// clang-format off
 template <typename T> void parser::remove_space(ArgVector &args, const T &space) {
 	args.erase(std::remove_if(args.begin(), args.end(),
-							  [&](const auto &elm) {
-								  return (std::holds_alternative<std::string>(elm) &&
-										  std::all_of(std::get<std::string>(elm).begin(),
-													  std::get<std::string>(elm).end(),
-													  [&](char ch) { return (space != '\0') ? ch == space : true; }));
-							  }),
-			   args.end());
+	  [&](const auto &elm) {
+		  return (std::holds_alternative<std::string>(elm) &&
+		  std::all_of(std::get<std::string>(elm).begin(),
+		  std::get<std::string>(elm).end(),
+		  [&](char ch) { return (space != '\0') ? ch == space : true; }));
+								  
+		  }), args.end());
 }
+// clang-format on
 
 
 template <typename T> VarMap parser::get_vmap(T arr) {
