@@ -35,7 +35,7 @@ CrazePy is a dynamically typed programming language, which means that a variable
 ## Compilation
 Compilation is simple. Just do :
 ```
-make
+cmake . && make
 ```
 And it should compile using the latest g++ version.
 
