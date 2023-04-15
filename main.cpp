@@ -1,6 +1,6 @@
 #include "lexer/lexer.h"
 #include "parser/parser.h"
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <iostream>
 
 int main(int argc, char **argv) {
@@ -8,7 +8,7 @@ int main(int argc, char **argv) {
 		std::cout << "Need source file!" << std::endl << "Usage : " << argv[0] << " <files>";
 		std::exit(1);
 	}
-	if (!boost::filesystem::exists(argv[1])) {
+	if (!std::filesystem::exists(argv[1])) {
 		std::cout << "Error! File '" << argv[1] << "' doesn't exist!" << std::endl;
 		std::exit(1);
 	}
